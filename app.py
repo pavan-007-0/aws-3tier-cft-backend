@@ -12,6 +12,7 @@ from cart import cart
 from products import products
 from orders import orders
 from admin import admin
+from chatbot import chatbot
 
 from create_tables import create_tables
 from error_handlers import register_error_handlers, setup_logging, log_request_info, register_api_exception_handler
@@ -45,6 +46,7 @@ app.register_blueprint(cart, url_prefix="/api/cart")
 app.register_blueprint(products, url_prefix="/api/products")
 app.register_blueprint(orders, url_prefix="/api/orders")
 app.register_blueprint(admin, url_prefix="/api/admin")
+app.register_blueprint(chatbot, url_prefix="/api/chatbot")
 
 @app.route("/")
 def home():

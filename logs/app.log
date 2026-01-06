@@ -1,0 +1,935 @@
+2025-12-30 16:51:54,878 INFO app MainThread : E-commerce application startup
+2025-12-30 16:51:56,197 INFO app MainThread : E-commerce application startup
+2025-12-30 16:56:03,529 INFO app MainThread : E-commerce application startup
+2025-12-30 16:56:04,607 INFO app MainThread : E-commerce application startup
+2025-12-30 17:10:55,509 INFO app Thread-4 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-30 17:10:55,514 INFO app Thread-3 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-30 17:10:55,522 INFO app Thread-4 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,523 INFO app Thread-3 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,525 INFO app Thread-5 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-30 17:10:55,527 INFO app Thread-4 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,528 INFO app Thread-3 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,529 INFO app Thread-6 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-30 17:10:55,529 INFO app Thread-5 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 17:10:55,533 INFO app Thread-6 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:10:55,533 INFO app Thread-7 (process_request_thread) : GET http://127.0.0.1:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:10:55,534 INFO app Thread-5 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 17:10:55,535 INFO app Thread-8 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2025-12-30 17:10:55,540 INFO app Thread-6 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:10:55,546 INFO app Thread-7 (process_request_thread) : Response: 308 - GET http://127.0.0.1:5000/api/products
+2025-12-30 17:10:55,552 INFO app Thread-8 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-30 17:10:55,555 INFO app Thread-9 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2025-12-30 17:10:55,561 INFO app Thread-10 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2025-12-30 17:10:55,562 INFO app Thread-8 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-30 17:10:55,562 INFO app Thread-9 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-30 17:10:55,563 INFO app Thread-10 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2025-12-30 17:10:55,565 INFO app Thread-9 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-30 17:10:55,565 INFO app Thread-11 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2025-12-30 17:10:55,568 INFO app Thread-10 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2025-12-30 17:10:55,569 INFO app Thread-12 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-30 17:10:55,575 INFO app Thread-13 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-30 17:10:55,575 INFO app Thread-11 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-30 17:10:55,577 INFO app Thread-14 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-30 17:10:55,577 INFO app Thread-12 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,578 INFO app Thread-13 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,578 INFO app Thread-11 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-30 17:10:55,579 INFO app Thread-14 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 17:10:55,580 INFO app Thread-12 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,583 INFO app Thread-13 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,584 INFO app Thread-15 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-30 17:10:55,585 INFO app Thread-14 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 17:10:55,586 INFO app Thread-15 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:10:55,595 INFO app Thread-15 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:10:55,600 INFO app Thread-16 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-30 17:10:55,602 INFO app Thread-17 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-30 17:10:55,606 INFO app Thread-16 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,612 INFO app Thread-17 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,613 INFO app Thread-16 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 17:10:55,621 INFO app Thread-17 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 17:10:55,622 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-30 17:10:55,623 INFO app Thread-18 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:10:55,630 INFO app Thread-18 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 17:17:41,786 INFO app MainThread : E-commerce application startup
+2025-12-30 17:17:42,092 INFO app MainThread : E-commerce application startup
+2025-12-30 17:18:37,662 INFO app MainThread : E-commerce application startup
+2025-12-30 17:18:37,822 INFO app MainThread : E-commerce application startup
+2025-12-30 17:24:20,314 INFO app MainThread : E-commerce application startup
+2025-12-30 17:24:20,314 INFO app MainThread : E-commerce application startup
+2025-12-30 17:27:16,680 INFO app MainThread : E-commerce application startup
+2025-12-30 17:27:16,925 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:17,024 ERROR app MainThread : Login error: 1054 (42S22): Unknown column 'is_active' in 'where clause'
+2025-12-30 17:27:17,025 WARNING app MainThread : API Exception: Login failed - Status: 500
+2025-12-30 17:27:17,027 INFO app MainThread : Response: 500 - POST http://localhost/api/login
+2025-12-30 17:27:17,258 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:17,260 WARNING app MainThread : API Exception: Invalid email format - Status: 400
+2025-12-30 17:27:17,261 INFO app MainThread : Response: 400 - POST http://localhost/api/login
+2025-12-30 17:27:17,484 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:17,552 INFO app MainThread : Response: 400 - POST http://localhost/api/login
+2025-12-30 17:27:17,740 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:18,412 ERROR app MainThread : Registration error: 1054 (42S22): Unknown column 'phone' in 'field list'
+2025-12-30 17:27:18,412 WARNING app MainThread : API Exception: Registration failed - Status: 500
+2025-12-30 17:27:18,414 INFO app MainThread : Response: 500 - POST http://localhost/api/register
+2025-12-30 17:27:18,416 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:18,521 ERROR app MainThread : Login error: 1054 (42S22): Unknown column 'is_active' in 'where clause'
+2025-12-30 17:27:18,522 WARNING app MainThread : API Exception: Login failed - Status: 500
+2025-12-30 17:27:18,523 INFO app MainThread : Response: 500 - POST http://localhost/api/login
+2025-12-30 17:27:18,751 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:19,406 ERROR app MainThread : Registration error: 1054 (42S22): Unknown column 'phone' in 'field list'
+2025-12-30 17:27:19,407 WARNING app MainThread : API Exception: Registration failed - Status: 500
+2025-12-30 17:27:19,408 INFO app MainThread : Response: 500 - POST http://localhost/api/register
+2025-12-30 17:27:19,409 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,517 ERROR app MainThread : Login error: 1054 (42S22): Unknown column 'is_active' in 'where clause'
+2025-12-30 17:27:19,518 WARNING app MainThread : API Exception: Login failed - Status: 500
+2025-12-30 17:27:19,519 INFO app MainThread : Response: 500 - POST http://localhost/api/login
+2025-12-30 17:27:19,701 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,703 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,703 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,705 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,705 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,706 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,708 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,709 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,709 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,710 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,711 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,712 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,715 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,716 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,717 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,718 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,719 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,719 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,720 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,721 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,721 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,723 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,724 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,724 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,725 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,726 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,727 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,728 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,730 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:19,731 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:19,924 INFO app MainThread : POST http://localhost/api/refresh - IP: 127.0.0.1
+2025-12-30 17:27:19,925 WARNING app MainThread : API Exception: Refresh token is required - Status: 400
+2025-12-30 17:27:19,926 INFO app MainThread : Response: 400 - POST http://localhost/api/refresh
+2025-12-30 17:27:20,107 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:20,541 ERROR app MainThread : Registration error: 1054 (42S22): Unknown column 'phone' in 'field list'
+2025-12-30 17:27:20,541 WARNING app MainThread : API Exception: Registration failed - Status: 500
+2025-12-30 17:27:20,542 INFO app MainThread : Response: 500 - POST http://localhost/api/register
+2025-12-30 17:27:20,543 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:20,545 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:27:20,546 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:27:20,716 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,129 ERROR app MainThread : Registration error: 1054 (42S22): Unknown column 'phone' in 'field list'
+2025-12-30 17:27:21,130 WARNING app MainThread : API Exception: Registration failed - Status: 500
+2025-12-30 17:27:21,131 INFO app MainThread : Response: 500 - POST http://localhost/api/register
+2025-12-30 17:27:21,302 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,304 WARNING app MainThread : API Exception: Invalid email format - Status: 400
+2025-12-30 17:27:21,304 INFO app MainThread : Response: 400 - POST http://localhost/api/register
+2025-12-30 17:27:21,498 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,525 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,525 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:27:21,710 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,712 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,713 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:27:21,886 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,887 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:27:21,887 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:28:01,934 INFO app MainThread : E-commerce application startup
+2025-12-30 17:28:41,508 INFO app MainThread : E-commerce application startup
+2025-12-30 17:28:41,511 INFO app MainThread : E-commerce application startup
+2025-12-30 17:29:45,939 INFO app MainThread : E-commerce application startup
+2025-12-30 17:29:46,000 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:01,185 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:01,224 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:14,708 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:14,914 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:55,019 INFO app MainThread : E-commerce application startup
+2025-12-30 17:30:55,067 INFO app MainThread : E-commerce application startup
+2025-12-30 17:31:33,949 INFO app MainThread : E-commerce application startup
+2025-12-30 17:31:34,081 INFO app MainThread : E-commerce application startup
+2025-12-30 17:38:58,698 INFO app MainThread : E-commerce application startup
+2025-12-30 17:38:58,708 INFO app MainThread : E-commerce application startup
+2025-12-30 17:39:55,294 INFO app MainThread : E-commerce application startup
+2025-12-30 17:39:55,295 INFO app MainThread : E-commerce application startup
+2025-12-30 17:41:32,499 INFO app MainThread : E-commerce application startup
+2025-12-30 17:41:32,533 INFO app MainThread : E-commerce application startup
+2025-12-30 17:44:01,874 INFO app MainThread : E-commerce application startup
+2025-12-30 17:44:02,055 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:02,149 WARNING app MainThread : API Exception: Invalid credentials - Status: 401
+2025-12-30 17:44:02,150 INFO app MainThread : Response: 401 - POST http://localhost/api/login
+2025-12-30 17:44:02,315 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:02,317 WARNING app MainThread : API Exception: Invalid email format - Status: 400
+2025-12-30 17:44:02,318 INFO app MainThread : Response: 400 - POST http://localhost/api/login
+2025-12-30 17:44:02,482 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:02,483 INFO app MainThread : Response: 400 - POST http://localhost/api/login
+2025-12-30 17:44:02,663 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:03,180 INFO app MainThread : Response: 201 - POST http://localhost/api/register
+2025-12-30 17:44:03,184 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:03,731 INFO app MainThread : Response: 200 - POST http://localhost/api/login
+2025-12-30 17:44:03,918 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:04,354 INFO app MainThread : Response: 201 - POST http://localhost/api/register
+2025-12-30 17:44:04,356 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:04,796 INFO app MainThread : Response: 200 - POST http://localhost/api/login
+2025-12-30 17:44:04,799 INFO app MainThread : POST http://localhost/api/logout - IP: 127.0.0.1
+2025-12-30 17:44:04,800 INFO app MainThread : Response: 200 - POST http://localhost/api/logout
+2025-12-30 17:44:05,010 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,012 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,013 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,015 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,016 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,017 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,020 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,021 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,022 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,028 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,032 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,033 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,034 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,035 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,036 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,037 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,039 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,042 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,044 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,046 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,046 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,048 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,049 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,049 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,051 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,053 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,054 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,055 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,061 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:05,061 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:05,359 INFO app MainThread : POST http://localhost/api/refresh - IP: 127.0.0.1
+2025-12-30 17:44:05,363 WARNING app MainThread : API Exception: Refresh token is required - Status: 400
+2025-12-30 17:44:05,367 INFO app MainThread : Response: 400 - POST http://localhost/api/refresh
+2025-12-30 17:44:05,625 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:06,036 INFO app MainThread : Response: 201 - POST http://localhost/api/register
+2025-12-30 17:44:06,037 INFO app MainThread : POST http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:06,041 WARNING app MainThread : Rate limit exceeded: http://localhost/api/login - IP: 127.0.0.1
+2025-12-30 17:44:06,042 INFO app MainThread : Response: 429 - POST http://localhost/api/login
+2025-12-30 17:44:06,220 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:06,610 INFO app MainThread : Response: 201 - POST http://localhost/api/register
+2025-12-30 17:44:06,611 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:06,710 WARNING app MainThread : API Exception: Email already exists - Status: 409
+2025-12-30 17:44:06,711 INFO app MainThread : Response: 409 - POST http://localhost/api/register
+2025-12-30 17:44:06,877 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:06,878 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:06,878 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:44:07,043 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,044 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,044 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:44:07,215 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,216 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,217 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:44:07,384 INFO app MainThread : POST http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,385 WARNING app MainThread : Rate limit exceeded: http://localhost/api/register - IP: 127.0.0.1
+2025-12-30 17:44:07,386 INFO app MainThread : Response: 429 - POST http://localhost/api/register
+2025-12-30 17:45:13,215 INFO app MainThread : E-commerce application startup
+2025-12-30 17:45:14,023 INFO app MainThread : E-commerce application startup
+2025-12-30 17:45:57,307 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:45:57,309 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:45:59,347 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:45:59,447 WARNING app Thread-4 (process_request_thread) : API Exception: Failed to fetch products - Status: 500
+2025-12-30 17:45:59,448 INFO app Thread-4 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/
+2025-12-30 17:46:01,486 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:46:01,591 WARNING app Thread-6 (process_request_thread) : API Exception: Search failed - Status: 500
+2025-12-30 17:46:01,592 INFO app Thread-6 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:46:03,641 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:46:03,751 WARNING app Thread-8 (process_request_thread) : API Exception: Failed to fetch categories - Status: 500
+2025-12-30 17:46:03,752 INFO app Thread-8 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:46:05,811 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:46:06,206 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:46:08,261 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:46:08,642 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:46:10,675 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:46:10,790 WARNING app Thread-14 (process_request_thread) : API Exception: Failed to add item to cart - Status: 500
+2025-12-30 17:46:10,791 INFO app Thread-14 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:46:12,841 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:46:12,844 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:46:14,882 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:46:15,002 WARNING app Thread-17 (process_request_thread) : API Exception: Failed to fetch cart - Status: 500
+2025-12-30 17:46:15,003 INFO app Thread-17 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/cart/
+2025-12-30 17:46:43,109 INFO app MainThread : E-commerce application startup
+2025-12-30 17:47:13,354 INFO app MainThread : E-commerce application startup
+2025-12-30 17:47:14,171 INFO app MainThread : E-commerce application startup
+2025-12-30 17:47:30,077 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:47:30,079 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:47:32,132 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:47:32,220 WARNING app Thread-4 (process_request_thread) : API Exception: Failed to fetch products - Status: 500
+2025-12-30 17:47:32,222 INFO app Thread-4 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/
+2025-12-30 17:47:34,251 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:47:34,366 WARNING app Thread-6 (process_request_thread) : API Exception: Search failed - Status: 500
+2025-12-30 17:47:34,368 INFO app Thread-6 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:47:36,419 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:47:36,556 WARNING app Thread-8 (process_request_thread) : API Exception: Failed to fetch categories - Status: 500
+2025-12-30 17:47:36,557 INFO app Thread-8 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:47:38,603 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:47:38,992 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:47:41,042 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:47:41,700 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:47:43,729 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:47:43,846 WARNING app Thread-14 (process_request_thread) : API Exception: Failed to add item to cart - Status: 500
+2025-12-30 17:47:43,847 INFO app Thread-14 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:47:45,887 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:47:45,887 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:47:47,928 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:47:48,021 WARNING app Thread-17 (process_request_thread) : API Exception: Failed to fetch cart - Status: 500
+2025-12-30 17:47:48,022 INFO app Thread-17 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/cart/
+2025-12-30 17:48:28,239 INFO app MainThread : E-commerce application startup
+2025-12-30 17:48:55,620 INFO app MainThread : E-commerce application startup
+2025-12-30 17:48:56,404 INFO app MainThread : E-commerce application startup
+2025-12-30 17:49:05,314 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:49:05,317 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:49:07,344 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:49:07,429 WARNING app Thread-4 (process_request_thread) : API Exception: Failed to fetch products - Status: 500
+2025-12-30 17:49:07,430 INFO app Thread-4 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/products/
+2025-12-30 17:49:09,474 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:49:09,572 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:49:11,625 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:49:11,716 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:49:13,757 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:49:14,148 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:49:16,185 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:49:16,593 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:49:18,621 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:49:18,757 WARNING app Thread-14 (process_request_thread) : API Exception: Failed to add item to cart - Status: 500
+2025-12-30 17:49:18,758 INFO app Thread-14 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:49:20,805 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:49:20,806 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:49:22,847 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:49:22,968 WARNING app Thread-17 (process_request_thread) : API Exception: Failed to fetch cart - Status: 500
+2025-12-30 17:49:22,969 INFO app Thread-17 (process_request_thread) : Response: 500 - GET http://localhost:5000/api/cart/
+2025-12-30 17:50:42,488 INFO app MainThread : E-commerce application startup
+2025-12-30 17:51:31,941 INFO app MainThread : E-commerce application startup
+2025-12-30 17:51:32,729 INFO app MainThread : E-commerce application startup
+2025-12-30 17:51:46,097 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:51:46,098 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:51:48,332 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:51:48,509 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 17:51:50,561 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:51:50,738 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:51:52,784 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:51:52,972 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:51:55,004 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:51:55,428 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:51:57,514 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:51:59,155 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:52:01,243 INFO app Thread-15 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:52:01,636 WARNING app Thread-15 (process_request_thread) : API Exception: Product not found or unavailable - Status: 404
+2025-12-30 17:52:01,637 INFO app Thread-15 (process_request_thread) : Response: 404 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:52:03,668 INFO app Thread-18 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:52:03,669 INFO app Thread-18 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:52:05,697 INFO app Thread-19 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:52:05,921 INFO app Thread-19 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 17:52:21,485 INFO app MainThread : E-commerce application startup
+2025-12-30 17:52:49,729 INFO app MainThread : E-commerce application startup
+2025-12-30 17:53:05,922 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:53:05,923 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:53:07,955 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:53:08,068 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 17:53:10,102 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:53:10,189 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:53:12,218 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:53:12,323 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:53:14,349 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:53:14,906 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:53:16,930 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:53:17,317 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:53:19,344 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:53:19,448 INFO app Thread-14 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:53:21,480 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:53:21,481 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:53:23,527 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:53:23,639 INFO app Thread-17 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 17:53:25,674 INFO app Thread-19 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 17:53:25,675 INFO app Thread-19 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 17:53:27,706 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 17:53:27,815 WARNING app Thread-20 (process_request_thread) : API Exception: Failed to create order - Status: 500
+2025-12-30 17:53:27,816 INFO app Thread-20 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/orders/
+2025-12-30 17:53:45,641 INFO app MainThread : E-commerce application startup
+2025-12-30 17:53:58,224 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:53:58,226 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:54:00,261 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:54:00,395 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 17:54:02,453 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:54:02,578 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:54:04,608 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:54:04,711 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:54:06,749 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:54:07,139 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:54:09,153 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:54:09,592 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:54:11,631 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:54:11,766 INFO app Thread-14 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:54:13,795 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:54:13,796 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:54:15,815 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:54:15,929 INFO app Thread-17 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 17:54:17,954 INFO app Thread-19 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 17:54:17,955 INFO app Thread-19 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 17:54:20,000 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 17:54:20,089 WARNING app Thread-20 (process_request_thread) : API Exception: Failed to create order - Status: 500
+2025-12-30 17:54:20,089 INFO app Thread-20 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/orders/
+2025-12-30 17:54:39,199 INFO app MainThread : E-commerce application startup
+2025-12-30 17:55:01,322 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:55:01,324 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:55:03,353 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:55:03,483 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 17:55:05,510 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:55:05,611 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:55:07,647 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:55:07,828 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:55:09,861 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:55:10,245 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:55:12,275 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:55:12,694 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:55:14,717 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:55:14,816 INFO app Thread-14 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:55:16,866 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:55:16,867 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:55:18,898 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:55:18,998 INFO app Thread-17 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 17:55:21,028 INFO app Thread-19 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 17:55:21,029 INFO app Thread-19 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 17:55:23,062 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 17:55:23,177 WARNING app Thread-20 (process_request_thread) : API Exception: Failed to create order - Status: 500
+2025-12-30 17:55:23,178 INFO app Thread-20 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/orders/
+2025-12-30 17:55:42,053 INFO app MainThread : E-commerce application startup
+2025-12-30 17:56:13,407 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 17:56:13,412 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 17:56:15,432 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 17:56:15,546 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 17:56:17,577 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 17:56:17,684 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 17:56:19,710 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 17:56:19,805 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 17:56:21,840 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 17:56:22,266 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 17:56:24,305 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 17:56:24,786 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 17:56:26,821 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 17:56:26,922 INFO app Thread-14 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 17:56:28,970 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 17:56:28,970 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 17:56:31,002 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 17:56:31,122 INFO app Thread-17 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 17:56:33,148 INFO app Thread-19 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 17:56:33,150 INFO app Thread-19 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 17:56:35,182 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 17:56:35,305 WARNING app Thread-20 (process_request_thread) : API Exception: Failed to create order - Status: 500
+2025-12-30 17:56:35,307 INFO app Thread-20 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/orders/
+2025-12-30 18:02:36,231 INFO app MainThread : E-commerce application startup
+2025-12-30 18:03:43,342 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 18:03:43,343 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 18:03:45,390 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 18:03:45,503 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 18:03:47,552 INFO app Thread-6 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 18:03:47,648 INFO app Thread-6 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 18:03:49,703 INFO app Thread-8 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 18:03:49,800 INFO app Thread-8 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 18:03:51,832 INFO app Thread-10 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 18:03:52,240 INFO app Thread-10 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 18:03:54,280 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 18:03:54,675 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 18:03:56,713 INFO app Thread-14 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 18:03:56,813 INFO app Thread-14 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 18:03:58,858 INFO app Thread-16 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 18:03:58,859 INFO app Thread-16 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 18:04:00,909 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 18:04:01,026 INFO app Thread-17 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 18:04:03,069 INFO app Thread-19 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 18:04:03,070 INFO app Thread-19 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 18:04:05,120 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 18:04:05,214 WARNING app Thread-20 (process_request_thread) : API Exception: Failed to create order - Status: 500
+2025-12-30 18:04:05,215 INFO app Thread-20 (process_request_thread) : Response: 500 - POST http://localhost:5000/api/orders/
+2025-12-30 18:04:23,830 INFO app MainThread : E-commerce application startup
+2025-12-30 18:04:34,200 INFO app MainThread : E-commerce application startup
+2025-12-30 18:04:57,395 INFO app MainThread : E-commerce application startup
+2025-12-30 18:05:08,573 INFO app Thread-3 (process_request_thread) : GET http://localhost:5000/api/products - IP: 127.0.0.1
+2025-12-30 18:05:08,582 INFO app Thread-3 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/products
+2025-12-30 18:05:10,680 INFO app Thread-4 (process_request_thread) : GET http://localhost:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 18:05:10,848 INFO app Thread-4 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/
+2025-12-30 18:05:12,877 INFO app Thread-7 (process_request_thread) : GET http://localhost:5000/api/products/search?q=MacBook - IP: 127.0.0.1
+2025-12-30 18:05:12,977 INFO app Thread-7 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/search?q=MacBook
+2025-12-30 18:05:15,027 INFO app Thread-9 (process_request_thread) : GET http://localhost:5000/api/products/categories - IP: 127.0.0.1
+2025-12-30 18:05:15,139 INFO app Thread-9 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/products/categories
+2025-12-30 18:05:17,190 INFO app Thread-11 (process_request_thread) : POST http://localhost:5000/api/register - IP: 127.0.0.1
+2025-12-30 18:05:17,601 INFO app Thread-11 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/register
+2025-12-30 18:05:19,628 INFO app Thread-13 (process_request_thread) : POST http://localhost:5000/api/login - IP: 127.0.0.1
+2025-12-30 18:05:20,016 INFO app Thread-13 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/login
+2025-12-30 18:05:22,053 INFO app Thread-15 (process_request_thread) : POST http://localhost:5000/api/cart/add - IP: 127.0.0.1
+2025-12-30 18:05:22,173 INFO app Thread-15 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/cart/add
+2025-12-30 18:05:24,198 INFO app Thread-17 (process_request_thread) : GET http://localhost:5000/api/cart - IP: 127.0.0.1
+2025-12-30 18:05:24,198 INFO app Thread-17 (process_request_thread) : Response: 308 - GET http://localhost:5000/api/cart
+2025-12-30 18:05:26,231 INFO app Thread-18 (process_request_thread) : GET http://localhost:5000/api/cart/ - IP: 127.0.0.1
+2025-12-30 18:05:26,339 INFO app Thread-18 (process_request_thread) : Response: 200 - GET http://localhost:5000/api/cart/
+2025-12-30 18:05:28,380 INFO app Thread-20 (process_request_thread) : POST http://localhost:5000/api/orders - IP: 127.0.0.1
+2025-12-30 18:05:28,381 INFO app Thread-20 (process_request_thread) : Response: 308 - POST http://localhost:5000/api/orders
+2025-12-30 18:05:30,430 INFO app Thread-21 (process_request_thread) : POST http://localhost:5000/api/orders/ - IP: 127.0.0.1
+2025-12-30 18:05:30,548 INFO app Thread-21 (process_request_thread) : Response: 201 - POST http://localhost:5000/api/orders/
+2025-12-30 18:14:40,927 INFO app MainThread : E-commerce application startup
+2025-12-30 18:14:41,973 INFO app MainThread : E-commerce application startup
+2025-12-30 18:21:51,785 INFO app Thread-9 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2025-12-30 18:21:51,798 INFO app Thread-7 (process_request_thread) : GET http://127.0.0.1:5000/api/products - IP: 127.0.0.1
+2025-12-30 18:21:51,798 INFO app Thread-10 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2025-12-30 18:21:51,799 INFO app Thread-6 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-30 18:21:51,800 INFO app Thread-5 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-30 18:21:51,800 INFO app Thread-4 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-30 18:21:51,818 INFO app Thread-9 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-30 18:21:51,835 INFO app Thread-3 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-30 18:21:51,840 INFO app Thread-7 (process_request_thread) : Response: 308 - GET http://127.0.0.1:5000/api/products
+2025-12-30 18:21:51,841 INFO app Thread-8 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-30 18:21:51,842 INFO app Thread-11 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-30 18:21:51,843 INFO app Thread-10 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-30 18:21:51,844 INFO app Thread-3 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 18:21:51,845 INFO app Thread-14 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2025-12-30 18:21:51,846 INFO app Thread-5 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 18:21:51,846 INFO app Thread-4 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 18:21:51,849 INFO app Thread-9 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-30 18:21:51,849 INFO app Thread-6 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 18:21:51,855 INFO app Thread-15 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-30 18:21:51,859 INFO app Thread-16 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2025-12-30 18:21:51,860 INFO app Thread-8 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-30 18:21:51,862 INFO app Thread-11 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 18:21:51,863 INFO app Thread-10 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-30 18:21:51,864 INFO app Thread-14 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2025-12-30 18:21:51,867 INFO app Thread-14 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2025-12-30 18:21:51,869 INFO app Thread-17 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-30 18:21:51,871 INFO app Thread-4 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 18:21:51,876 INFO app Thread-6 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 18:21:51,877 INFO app Thread-15 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 18:21:51,880 INFO app Thread-16 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-30 18:21:51,889 INFO app Thread-11 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-30 18:21:51,891 INFO app Thread-5 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 18:21:51,892 INFO app Thread-17 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 18:21:51,894 INFO app Thread-15 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-30 18:21:51,894 INFO app Thread-16 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-30 18:21:51,908 INFO app Thread-17 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-30 18:21:52,021 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/products/ - IP: 127.0.0.1
+2025-12-30 18:21:52,865 INFO app Thread-18 (process_request_thread) : Response: 200 - GET http://127.0.0.1:5000/api/products/
+2025-12-30 18:23:04,588 INFO app MainThread : E-commerce application startup
+2025-12-30 18:23:06,811 INFO app MainThread : E-commerce application startup
+2025-12-30 19:25:40,031 INFO app MainThread : E-commerce application startup
+2025-12-30 19:25:40,180 INFO app MainThread : E-commerce application startup
+2025-12-31 18:26:46,475 INFO app MainThread : E-commerce application startup
+2025-12-31 18:26:50,863 INFO app MainThread : E-commerce application startup
+2025-12-31 18:35:06,632 INFO app Thread-4 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-31 18:35:06,636 INFO app Thread-3 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2025-12-31 18:35:06,637 INFO app Thread-5 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-31 18:35:06,652 INFO app Thread-4 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-31 18:35:06,652 INFO app Thread-3 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-31 18:35:06,653 INFO app Thread-6 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-31 18:35:06,653 INFO app Thread-5 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:35:06,654 INFO app Thread-7 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-31 18:35:06,656 INFO app Thread-4 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-31 18:35:06,657 INFO app Thread-9 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2025-12-31 18:35:06,658 INFO app Thread-3 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-31 18:35:06,659 INFO app Thread-6 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-31 18:35:06,659 INFO app Thread-5 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:35:06,663 INFO app Thread-7 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:35:06,667 INFO app Thread-9 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2025-12-31 18:35:06,682 INFO app Thread-10 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2025-12-31 18:35:06,682 INFO app Thread-7 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:35:06,683 INFO app Thread-9 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2025-12-31 18:35:06,684 INFO app Thread-10 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-31 18:35:06,696 INFO app Thread-11 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2025-12-31 18:35:06,698 INFO app Thread-10 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-31 18:35:06,699 INFO app Thread-12 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-31 18:35:06,702 INFO app Thread-11 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-31 18:35:06,703 INFO app Thread-13 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-31 18:35:06,712 INFO app Thread-11 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-31 18:35:06,716 INFO app Thread-15 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-31 18:35:06,717 INFO app Thread-13 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-31 18:35:06,718 INFO app Thread-16 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-31 18:35:06,718 INFO app Thread-12 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-31 18:35:06,722 INFO app Thread-15 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:35:06,725 INFO app Thread-16 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:35:06,730 INFO app Thread-12 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2025-12-31 18:35:06,731 INFO app Thread-15 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:35:06,739 INFO app Thread-16 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:36:40,500 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2025-12-31 18:36:40,509 INFO app Thread-17 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2025-12-31 18:36:40,525 INFO app Thread-20 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2025-12-31 18:36:40,560 INFO app Thread-18 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-31 18:36:40,563 INFO app Thread-21 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2025-12-31 18:36:40,566 INFO app Thread-17 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2025-12-31 18:36:40,586 INFO app Thread-20 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-31 18:36:40,611 INFO app Thread-18 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2025-12-31 18:36:40,611 INFO app Thread-22 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2025-12-31 18:36:40,625 INFO app Thread-21 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:36:40,626 INFO app Thread-23 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2025-12-31 18:36:40,646 INFO app Thread-20 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2025-12-31 18:36:40,670 INFO app Thread-22 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2025-12-31 18:36:40,671 INFO app Thread-21 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2025-12-31 18:36:40,671 INFO app Thread-23 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:36:40,774 INFO app Thread-24 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2025-12-31 18:36:40,783 INFO app Thread-22 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2025-12-31 18:36:40,792 INFO app Thread-24 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-31 18:36:40,808 INFO app Thread-24 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2025-12-31 18:36:40,888 INFO app Thread-23 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2025-12-31 18:36:41,435 INFO app Thread-25 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2025-12-31 18:36:41,451 INFO app Thread-25 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2025-12-31 18:36:41,460 INFO app Thread-25 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 12:31:14,584 INFO app MainThread : E-commerce application startup
+2026-01-01 12:31:16,240 INFO app MainThread : E-commerce application startup
+2026-01-01 12:34:22,379 INFO app Thread-3 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 12:34:22,404 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 12:34:22,426 INFO app Thread-5 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 12:34:22,427 INFO app Thread-5 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 12:34:27,851 INFO app Thread-7 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 12:34:27,858 INFO app Thread-7 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 12:34:27,859 INFO app Thread-9 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 12:34:27,862 INFO app Thread-10 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 12:34:27,863 INFO app Thread-9 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 12:34:27,865 INFO app Thread-11 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 12:34:27,870 INFO app Thread-10 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 12:34:27,871 INFO app Thread-12 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 12:34:27,874 INFO app Thread-9 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 12:34:27,876 INFO app Thread-10 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 12:34:27,908 INFO app Thread-11 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 12:34:27,909 INFO app Thread-12 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 12:34:27,910 INFO app Thread-11 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 12:34:27,914 INFO app Thread-13 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 12:34:27,915 INFO app Thread-12 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 12:34:27,917 INFO app Thread-13 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 12:34:27,918 INFO app Thread-14 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 12:34:27,921 INFO app Thread-15 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 12:34:27,923 INFO app Thread-13 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 12:34:27,924 INFO app Thread-14 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 12:34:27,929 INFO app Thread-15 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 12:34:27,930 INFO app Thread-16 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 12:34:27,931 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 12:34:27,932 INFO app Thread-15 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 12:34:27,932 INFO app Thread-14 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 12:34:27,934 INFO app Thread-16 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 12:34:27,934 INFO app Thread-18 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 12:34:27,941 INFO app Thread-18 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 12:34:27,942 INFO app Thread-19 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 12:34:27,947 INFO app Thread-19 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 12:34:27,947 INFO app Thread-19 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 12:34:27,954 INFO app Thread-20 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 12:34:27,955 INFO app Thread-20 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 12:34:27,959 INFO app Thread-20 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 12:35:20,421 INFO app Thread-21 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 12:35:20,423 INFO app Thread-21 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 12:35:20,442 INFO app Thread-23 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 12:35:20,443 INFO app Thread-23 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 13:03:56,781 INFO app Thread-24 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:03:56,800 INFO app Thread-24 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 13:03:56,810 INFO app Thread-26 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:03:56,810 INFO app Thread-26 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 13:04:07,989 INFO app Thread-28 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 13:04:07,990 INFO app Thread-30 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 13:04:07,992 INFO app Thread-28 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 13:04:07,993 INFO app Thread-31 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 13:04:07,995 INFO app Thread-30 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 13:04:07,996 INFO app Thread-32 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 13:04:08,000 INFO app Thread-31 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:04:08,002 INFO app Thread-33 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 13:04:08,002 INFO app Thread-30 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 13:04:08,005 INFO app Thread-32 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:04:08,034 INFO app Thread-34 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 13:04:08,034 INFO app Thread-31 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:04:08,035 INFO app Thread-35 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 13:04:08,035 INFO app Thread-33 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:04:08,039 INFO app Thread-32 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:04:08,039 INFO app Thread-34 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 13:04:08,040 INFO app Thread-35 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 13:04:08,040 INFO app Thread-33 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:04:08,042 INFO app Thread-34 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 13:04:08,047 INFO app Thread-35 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 13:04:08,050 INFO app Thread-36 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 13:04:08,060 INFO app Thread-36 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 13:04:08,061 INFO app Thread-37 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 13:04:08,064 INFO app Thread-39 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 13:04:08,065 INFO app Thread-36 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 13:04:08,068 INFO app Thread-37 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 13:04:08,069 INFO app Thread-40 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 13:04:08,069 INFO app Thread-39 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:04:08,071 INFO app Thread-41 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 13:04:08,071 INFO app Thread-40 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:04:08,072 INFO app Thread-39 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:04:08,072 INFO app Thread-41 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:04:08,073 INFO app Thread-40 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:04:08,078 INFO app Thread-41 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:04:58,345 INFO app Thread-42 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:04:58,348 INFO app Thread-42 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 13:04:58,354 INFO app Thread-44 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:04:58,355 INFO app Thread-44 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 13:05:01,349 INFO app Thread-45 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:05:01,349 INFO app Thread-45 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 13:07:38,027 INFO app Thread-48 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 13:07:38,032 INFO app Thread-47 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 13:07:38,037 INFO app Thread-50 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 13:07:38,042 INFO app Thread-48 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:07:38,043 INFO app Thread-51 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 13:07:38,044 INFO app Thread-47 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 13:07:38,050 INFO app Thread-50 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:07:38,050 INFO app Thread-51 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:07:38,064 INFO app Thread-48 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:07:38,066 INFO app Thread-52 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 13:07:38,067 INFO app Thread-50 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:07:38,068 INFO app Thread-53 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 13:07:38,070 INFO app Thread-51 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:07:38,081 INFO app Thread-54 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 13:07:38,075 INFO app Thread-53 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 13:07:38,082 INFO app Thread-54 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 13:07:38,073 INFO app Thread-52 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 13:07:38,096 INFO app Thread-53 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 13:07:38,097 INFO app Thread-55 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 13:07:38,103 INFO app Thread-54 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 13:07:38,105 INFO app Thread-52 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 13:07:38,107 INFO app Thread-56 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 13:07:38,107 INFO app Thread-55 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 13:07:38,109 INFO app Thread-58 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 13:07:38,110 INFO app Thread-56 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 13:07:38,110 INFO app Thread-55 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 13:07:38,119 INFO app Thread-58 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:07:38,128 INFO app Thread-59 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 13:07:38,129 INFO app Thread-58 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 13:07:38,131 INFO app Thread-60 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 13:07:38,136 INFO app Thread-59 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:07:38,140 INFO app Thread-59 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 13:07:38,141 INFO app Thread-60 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:07:38,142 INFO app Thread-60 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 13:07:54,251 INFO app Thread-61 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:07:54,255 INFO app Thread-61 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 13:07:54,272 INFO app Thread-63 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:07:54,273 INFO app Thread-63 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 13:08:05,720 INFO app Thread-64 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:08:05,721 INFO app Thread-64 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 13:08:05,727 INFO app Thread-66 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 13:08:05,727 INFO app Thread-66 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-01 16:14:41,852 INFO app MainThread : E-commerce application startup
+2026-01-01 16:14:43,285 INFO app MainThread : E-commerce application startup
+2026-01-01 17:29:16,729 INFO app Thread-3 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 17:29:16,771 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:04:03,408 INFO app Thread-5 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 18:04:03,419 INFO app Thread-5 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:06:53,810 INFO app Thread-7 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 18:06:53,812 INFO app Thread-7 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:06:56,800 INFO app Thread-9 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 18:06:56,809 INFO app Thread-9 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:07:02,492 INFO app Thread-11 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 18:07:02,493 INFO app Thread-13 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:07:02,499 INFO app Thread-11 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 18:07:02,500 INFO app Thread-14 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:07:02,537 INFO app Thread-13 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,538 INFO app Thread-15 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:07:02,559 INFO app Thread-14 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:02,561 INFO app Thread-16 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 18:07:02,562 INFO app Thread-15 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,562 INFO app Thread-13 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,566 INFO app Thread-17 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 18:07:02,566 INFO app Thread-14 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:02,567 INFO app Thread-16 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:07:02,572 INFO app Thread-15 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,573 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 18:07:02,575 INFO app Thread-16 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:07:02,576 INFO app Thread-17 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:07:02,577 INFO app Thread-18 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:07:02,578 INFO app Thread-17 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:07:02,592 INFO app Thread-18 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:07:02,593 INFO app Thread-19 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 18:07:02,599 INFO app Thread-19 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:07:02,600 INFO app Thread-20 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 18:07:02,601 INFO app Thread-22 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:07:02,605 INFO app Thread-19 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:07:02,609 INFO app Thread-23 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:07:02,610 INFO app Thread-20 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 18:07:02,611 INFO app Thread-22 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,612 INFO app Thread-24 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:07:02,613 INFO app Thread-22 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,615 INFO app Thread-23 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,619 INFO app Thread-24 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:02,620 INFO app Thread-23 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,625 INFO app Thread-24 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:02,640 INFO app Thread-25 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:07:02,645 INFO app Thread-25 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,651 INFO app Thread-26 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:07:02,652 INFO app Thread-25 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:07:02,653 INFO app Thread-27 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:07:02,653 INFO app Thread-26 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,655 INFO app Thread-27 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:02,656 INFO app Thread-26 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:07:02,657 INFO app Thread-27 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:07:19,923 INFO app Thread-28 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 18:07:19,925 INFO app Thread-28 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:31:20,885 INFO app Thread-30 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-01 18:31:20,907 INFO app Thread-30 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-01 18:31:23,884 INFO app Thread-32 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 18:31:23,884 INFO app Thread-33 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:31:23,888 INFO app Thread-32 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 18:31:23,889 INFO app Thread-35 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:31:23,890 INFO app Thread-33 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:23,904 INFO app Thread-36 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:31:23,904 INFO app Thread-35 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:31:23,905 INFO app Thread-37 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 18:31:23,906 INFO app Thread-33 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:23,908 INFO app Thread-38 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 18:31:23,911 INFO app Thread-36 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:23,912 INFO app Thread-39 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 18:31:23,914 INFO app Thread-35 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:31:23,916 INFO app Thread-37 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:31:23,918 INFO app Thread-38 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:31:23,919 INFO app Thread-36 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:23,922 INFO app Thread-37 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:31:23,923 INFO app Thread-38 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:31:23,928 INFO app Thread-39 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:31:23,929 INFO app Thread-40 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 18:31:23,942 INFO app Thread-42 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:31:23,942 INFO app Thread-39 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:31:23,943 INFO app Thread-41 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 18:31:23,944 INFO app Thread-40 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:31:23,946 INFO app Thread-42 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:23,947 INFO app Thread-41 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 18:31:23,953 INFO app Thread-40 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:31:23,954 INFO app Thread-42 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:23,955 INFO app Thread-44 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:31:23,962 INFO app Thread-45 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:31:23,964 INFO app Thread-44 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:23,969 INFO app Thread-45 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:31:23,973 INFO app Thread-44 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:23,979 INFO app Thread-45 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:31:34,105 INFO app Thread-47 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-01 18:31:34,109 INFO app Thread-46 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-01 18:31:34,111 INFO app Thread-49 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-01 18:31:34,112 INFO app Thread-47 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:31:34,118 INFO app Thread-49 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:31:34,113 INFO app Thread-46 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-01 18:31:34,118 INFO app Thread-50 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-01 18:31:34,119 INFO app Thread-47 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-01 18:31:34,123 INFO app Thread-51 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-01 18:31:34,125 INFO app Thread-52 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-01 18:31:34,125 INFO app Thread-50 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:34,126 INFO app Thread-49 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-01 18:31:34,127 INFO app Thread-50 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-01 18:31:34,127 INFO app Thread-51 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:31:34,129 INFO app Thread-52 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:34,131 INFO app Thread-53 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-01 18:31:34,137 INFO app Thread-54 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-01 18:31:34,137 INFO app Thread-51 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-01 18:31:34,141 INFO app Thread-52 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-01 18:31:34,142 INFO app Thread-53 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:31:34,144 INFO app Thread-53 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-01 18:31:34,147 INFO app Thread-54 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:31:34,151 INFO app Thread-54 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-01 18:42:34,460 INFO app MainThread : E-commerce application startup
+2026-01-01 18:42:35,959 INFO app MainThread : E-commerce application startup
+2026-01-02 13:01:29,092 INFO app MainThread : E-commerce application startup
+2026-01-02 13:02:38,570 INFO app MainThread : E-commerce application startup
+2026-01-02 13:04:36,428 INFO app MainThread : E-commerce application startup
+2026-01-02 13:04:38,268 INFO app MainThread : E-commerce application startup
+2026-01-02 13:07:57,877 INFO app Thread-3 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:07:57,880 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:07:58,078 INFO app Thread-4 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:08:02,540 INFO app Thread-4 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:08:51,636 INFO app Thread-7 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:08:51,648 INFO app Thread-7 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:08:51,814 INFO app Thread-8 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:08:56,442 INFO app Thread-8 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:09:24,731 INFO app Thread-11 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:09:24,732 INFO app Thread-11 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:09:25,000 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:09:29,218 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:15:56,367 INFO app Thread-15 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:15:56,386 INFO app Thread-15 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:15:56,500 INFO app Thread-16 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:16:01,033 INFO app Thread-16 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:20:27,717 INFO app MainThread : E-commerce application startup
+2026-01-02 13:21:02,590 INFO app MainThread : E-commerce application startup
+2026-01-02 13:21:50,675 INFO app MainThread : E-commerce application startup
+2026-01-02 13:23:14,030 INFO app MainThread : E-commerce application startup
+2026-01-02 13:23:32,845 INFO app MainThread : E-commerce application startup
+2026-01-02 13:23:48,135 INFO app MainThread : E-commerce application startup
+2026-01-02 13:25:10,299 INFO app Thread-3 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:25:10,308 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:25:10,467 INFO app Thread-4 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:25:10,820 INFO app Thread-4 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:26:50,362 INFO app Thread-7 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:26:50,370 INFO app Thread-7 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:26:50,523 INFO app Thread-8 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:26:50,943 INFO app Thread-8 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:27:19,447 INFO app Thread-10 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:27:19,460 INFO app Thread-10 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:27:19,778 INFO app Thread-11 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:27:19,987 INFO app Thread-11 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:30:56,380 INFO app MainThread : E-commerce application startup
+2026-01-02 13:32:10,478 INFO app MainThread : E-commerce application startup
+2026-01-02 13:32:42,412 INFO app MainThread : E-commerce application startup
+2026-01-02 13:36:24,185 INFO app Thread-3 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:36:24,197 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:36:24,340 INFO app Thread-4 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:36:24,359 INFO app Thread-4 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:37:45,334 INFO app Thread-7 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:37:45,335 INFO app Thread-7 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:37:45,600 INFO app Thread-8 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:37:46,065 INFO app Thread-8 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:40:40,579 INFO app Thread-11 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:40:40,588 INFO app Thread-11 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-02 13:40:40,838 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-02 13:40:40,843 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-02 13:42:48,168 INFO app Thread-15 (process_request_thread) : OPTIONS http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-02 13:42:48,169 INFO app Thread-15 (process_request_thread) : Response: 200 - OPTIONS http://127.0.0.1:5000/api/logout
+2026-01-02 13:42:48,174 INFO app Thread-17 (process_request_thread) : POST http://127.0.0.1:5000/api/logout - IP: 127.0.0.1
+2026-01-02 13:42:48,174 INFO app Thread-17 (process_request_thread) : Response: 200 - POST http://127.0.0.1:5000/api/logout
+2026-01-02 13:42:53,284 INFO app Thread-19 (process_request_thread) : GET http://127.0.0.1:5000/api/products - IP: 127.0.0.1
+2026-01-02 13:42:53,284 INFO app Thread-18 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-02 13:42:53,297 INFO app Thread-21 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-02 13:42:53,316 INFO app Thread-18 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-02 13:42:53,318 INFO app Thread-22 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-02 13:42:53,352 INFO app Thread-21 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-02 13:42:53,353 INFO app Thread-19 (process_request_thread) : Response: 308 - GET http://127.0.0.1:5000/api/products
+2026-01-02 13:42:53,355 INFO app Thread-22 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-02 13:42:53,355 INFO app Thread-21 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-02 13:42:53,357 INFO app Thread-23 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-02 13:42:53,363 INFO app Thread-22 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-02 13:42:53,365 INFO app Thread-24 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/dashboard - IP: 127.0.0.1
+2026-01-02 13:42:53,365 INFO app Thread-23 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-02 13:42:53,429 INFO app Thread-25 (process_request_thread) : GET http://127.0.0.1:5000/api/analytics/products?limit=5 - IP: 127.0.0.1
+2026-01-02 13:42:53,430 INFO app Thread-24 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-02 13:42:53,439 INFO app Thread-23 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-02 13:42:53,442 INFO app Thread-26 (process_request_thread) : GET http://127.0.0.1:5000/api/customers/stats - IP: 127.0.0.1
+2026-01-02 13:42:53,445 INFO app Thread-25 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-02 13:42:53,446 INFO app Thread-24 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/dashboard
+2026-01-02 13:42:53,449 INFO app Thread-27 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/campaigns - IP: 127.0.0.1
+2026-01-02 13:42:53,450 INFO app Thread-26 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers/stats
+2026-01-02 13:42:53,450 INFO app Thread-25 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/analytics/products?limit=5
+2026-01-02 13:42:53,454 INFO app Thread-27 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-02 13:42:53,468 INFO app Thread-26 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers/stats
+2026-01-02 13:42:53,470 INFO app Thread-30 (process_request_thread) : GET http://127.0.0.1:5000/api/products/ - IP: 127.0.0.1
+2026-01-02 13:42:53,471 INFO app Thread-28 (process_request_thread) : GET http://127.0.0.1:5000/api/orders/admin/all - IP: 127.0.0.1
+2026-01-02 13:42:53,476 INFO app Thread-27 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/campaigns
+2026-01-02 13:42:53,485 INFO app Thread-28 (process_request_thread) : Response: 401 - GET http://127.0.0.1:5000/api/orders/admin/all
+2026-01-02 13:42:53,489 INFO app Thread-31 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/settings - IP: 127.0.0.1
+2026-01-02 13:42:53,501 INFO app Thread-31 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/settings
+2026-01-02 13:42:53,529 INFO app Thread-32 (process_request_thread) : GET http://127.0.0.1:5000/api/notifications/templates - IP: 127.0.0.1
+2026-01-02 13:42:53,559 INFO app Thread-33 (process_request_thread) : GET http://127.0.0.1:5000/api/customers?page=1&limit=50 - IP: 127.0.0.1
+2026-01-02 13:42:53,584 INFO app Thread-31 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/settings
+2026-01-02 13:42:53,603 INFO app Thread-32 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/notifications/templates
+2026-01-02 13:42:53,604 INFO app Thread-33 (process_request_thread) : Resource not found: http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-02 13:42:53,607 INFO app Thread-32 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/notifications/templates
+2026-01-02 13:42:53,611 INFO app Thread-33 (process_request_thread) : Response: 404 - GET http://127.0.0.1:5000/api/customers?page=1&limit=50
+2026-01-02 13:42:53,804 INFO app Thread-30 (process_request_thread) : Response: 200 - GET http://127.0.0.1:5000/api/products/
+2026-01-02 20:38:41,474 INFO app MainThread : E-commerce application startup
+2026-01-02 20:38:42,756 INFO app MainThread : E-commerce application startup
+2026-01-06 09:19:40,644 INFO app MainThread : E-commerce application startup
+2026-01-06 09:19:41,997 INFO app MainThread : E-commerce application startup
+2026-01-06 09:20:54,921 INFO app Thread-3 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:20:54,933 INFO app Thread-3 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-06 09:20:55,077 INFO app Thread-4 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:20:55,082 INFO app Thread-4 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-06 09:21:14,678 INFO app Thread-7 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:21:14,679 INFO app Thread-7 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-06 09:21:14,975 INFO app Thread-8 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:21:15,421 INFO app Thread-8 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-01-06 09:21:31,911 INFO app Thread-11 (process_request_thread) : OPTIONS http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:21:31,911 INFO app Thread-11 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
+2026-01-06 09:21:32,175 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
+2026-01-06 09:21:32,176 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message

@@ -6,8 +6,8 @@ services:
 variables:
   DOCKER_TLS_CERTDIR: ""
   AWS_REGION: us-east-1
-  BACKEND_ECR_REPO: backend-repo
-  FRONTEND_ECR_REPO: frontend-repo
+  BACKEND_REPO: backend-repo
+  FRONTEND_REPO: frontend-repo
   IMAGE_TAG: latest
   STACK_NAME: ecommerce-fargate-test
 
@@ -18,26 +18,31 @@ stages:
 before_script:
   - apk add --no-cache aws-cli
   - aws sts get-caller-identity
+  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# ---------------- BUILD BACKEND IMAGE ----------------
+  # Create backend ECR repo if not exists
+  - |
+    aws ecr describe-repositories \
+      --repository-names $BACKEND_REPO \
+      --region $AWS_REGION \
+    || aws ecr create-repository \
+      --repository-name $BACKEND_REPO \
+      --region $AWS_REGION
+
+  # Login to ECR
+  - aws ecr get-login-password --region $AWS_REGION |
+    docker login --username AWS --password-stdin \
+    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+# ---------------- BUILD & PUSH BACKEND ----------------
 build-backend:
   stage: build
   script:
-    - |
-      aws ecr describe-repositories \
-        --repository-names $BACKEND_ECR_REPO \
-        --region $AWS_REGION \
-      || aws ecr create-repository \
-        --repository-name $BACKEND_ECR_REPO \
-        --region $AWS_REGION
-    - aws ecr get-login-password --region $AWS_REGION |
-      docker login --username AWS --password-stdin \
-      $CI_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-    - docker build -t $BACKEND_ECR_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_ECR_REPO:$IMAGE_TAG \
-      $CI_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_ECR_REPO:$IMAGE_TAG
+    - docker build -t $BACKEND_REPO:$IMAGE_TAG .
+    - docker tag $BACKEND_REPO:$IMAGE_TAG \
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
     - docker push \
-      $CI_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_ECR_REPO:$IMAGE_TAG
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
   only:
     - main
 
@@ -51,7 +56,7 @@ deploy-infra:
         --template-file infra/ecs-fargate.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
         --parameter-overrides \
-          BackendImageURI=$CI_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_ECR_REPO:$IMAGE_TAG \
-          FrontendImageURI=$CI_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_ECR_REPO:$IMAGE_TAG
+          BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
+          FrontendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO:$IMAGE_TAG
   only:
     - main

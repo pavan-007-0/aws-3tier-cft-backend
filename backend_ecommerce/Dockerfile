@@ -2,13 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy requirements from inner folder
-COPY backend_ecommerce/requirements.txt .
+# copy requirements from inner backend_ecommerce folder
+COPY backend_ecommerce/requirements.txt /app/requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy full backend source
-COPY backend_ecommerce/ .
+# copy full backend source
+COPY backend_ecommerce/ /app/
 
 EXPOSE 5000
 

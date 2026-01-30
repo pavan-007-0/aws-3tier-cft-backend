@@ -20,7 +20,7 @@ before_script:
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-  # Create backend ECR repo if not exists
+  # Create backend ECR repo if missing
   - |
     aws ecr describe-repositories \
       --repository-names $BACKEND_REPO \
@@ -29,20 +29,16 @@ before_script:
       --repository-name $BACKEND_REPO \
       --region $AWS_REGION
 
-  # Login to ECR
-  - aws ecr get-login-password --region $AWS_REGION |
-    docker login --username AWS --password-stdin \
-    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+  # Login to ECR (SAFE single-line command)
+  - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-# ---------------- BUILD & PUSH BACKEND ----------------
+# ---------------- BUILD & PUSH BACKEND IMAGE ----------------
 build-backend:
   stage: build
   script:
     - docker build -t $BACKEND_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_REPO:$IMAGE_TAG \
-      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - docker push \
-      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
   only:
     - main
 
@@ -60,3 +56,5 @@ deploy-infra:
           FrontendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO:$IMAGE_TAG
   only:
     - main
+  needs:
+    - build-backend

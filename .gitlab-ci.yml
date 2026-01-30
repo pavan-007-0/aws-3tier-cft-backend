@@ -19,11 +19,9 @@ before_script:
   - apk add --no-cache aws-cli
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-  - echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
   - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_REGION || aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_REGION
   - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-# ---------------- BUILD & PUSH BACKEND IMAGE ----------------
 build-backend:
   stage: build
   script:
@@ -33,7 +31,6 @@ build-backend:
   only:
     - main
 
-# ---------------- DEPLOY INFRA USING CLOUDFORMATION ----------------
 deploy-infra:
   stage: deploy
   script:

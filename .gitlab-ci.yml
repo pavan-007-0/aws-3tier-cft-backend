@@ -16,31 +16,14 @@ stages:
   - deploy
 
 before_script:
-  # Install AWS CLI
   - apk add --no-cache aws-cli
-
-  # Verify AWS identity
   - aws sts get-caller-identity
-
-  # Fetch AWS Account ID dynamically
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   - echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
-
-  # Create backend ECR repo if it does not exist
-  - |
-    aws ecr describe-repositories \
-      --repository-names $BACKEND_REPO \
-      --region $AWS_REGION \
-    || aws ecr create-repository \
-      --repository-name $BACKEND_REPO \
-      --region $AWS_REGION
-
-  # Login to ECR (single-line, safe)
+  - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_REGION || aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_REGION
   - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-# -------------------------------------------------
-# BUILD & PUSH BACKEND IMAGE
-# -------------------------------------------------
+# ---------------- BUILD & PUSH BACKEND IMAGE ----------------
 build-backend:
   stage: build
   script:
@@ -50,20 +33,11 @@ build-backend:
   only:
     - main
 
-# -------------------------------------------------
-# DEPLOY FULL INFRA USING CLOUDFORMATION
-# -------------------------------------------------
+# ---------------- DEPLOY INFRA USING CLOUDFORMATION ----------------
 deploy-infra:
   stage: deploy
   script:
-    - |
-      aws cloudformation deploy \
-        --stack-name $STACK_NAME \
-        --template-file infra/ecs-fargate.yaml \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-          BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
-          FrontendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO:$IMAGE_TAG
+    - aws cloudformation deploy --stack-name $STACK_NAME --template-file infra/ecs-fargate.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG FrontendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO:$IMAGE_TAG
   only:
     - main
   needs:

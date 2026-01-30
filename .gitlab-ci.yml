@@ -5,37 +5,54 @@ services:
 
 variables:
   DOCKER_TLS_CERTDIR: ""
-  AWS_REGION: us-east-1
+  AWS_REGION: ap-south-1
   BACKEND_REPO: backend-repo
-  FRONTEND_REPO: frontend-repo
-  IMAGE_TAG: latest
-  STACK_NAME: ecommerce-fargate-test
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
 stages:
   - build
   - deploy
 
 before_script:
+  # Install AWS CLI
   - apk add --no-cache aws-cli
-  - aws sts get-caller-identity
-  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-  - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_REGION || aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_REGION
-  - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-build-backend:
+  # Verify AWS identity
+  - aws sts get-caller-identity
+
+  # Export AWS Account ID
+  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+  # Login to Amazon ECR
+  - aws ecr get-login-password --region $AWS_REGION |
+    docker login --username AWS --password-stdin
+    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+build_backend:
   stage: build
   script:
-    - docker build -t $BACKEND_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-  only:
-    - main
+    # Build backend image (Dockerfile is inside backend_ecommerce/)
+    - docker build
+      -f backend_ecommerce/Dockerfile
+      -t $BACKEND_REPO:$IMAGE_TAG
+      backend_ecommerce
 
-deploy-infra:
+    # Tag image for ECR
+    - docker tag $BACKEND_REPO:$IMAGE_TAG
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+
+    # Push image to ECR
+    - docker push
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+
+deploy_backend:
   stage: deploy
   script:
-    - aws cloudformation deploy --stack-name $STACK_NAME --template-file infra/ecs-fargate.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG FrontendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO:$IMAGE_TAG
+    # Force ECS service to redeploy latest image
+    - aws ecs update-service
+      --cluster backend-cluster
+      --service backend-service
+      --force-new-deployment
+      --region $AWS_REGION
   only:
     - main
-  needs:
-    - build-backend

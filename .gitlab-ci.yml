@@ -1,0 +1,372 @@
+image: docker:24
+
+services:
+  - docker:24-dind
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+  AWS_DEFAULT_REGION: us-east-1
+  BACKEND_REPO: backend-repo
+  IMAGE_TAG: latest
+  BACKEND_STACK_NAME: backend-stack
+
+stages:
+  - build
+  - deploy
+
+before_script:
+  - apk add --no-cache aws-cli
+  - aws sts get-caller-identity
+  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  - echo "========================================="
+  - echo "AWS Account ID: $AWS_ACCOUNT_ID"
+  - echo "AWS Region: $AWS_DEFAULT_REGION"
+  - echo "========================================="
+
+# ==================== BUILD BACKEND ====================
+build-backend:
+  stage: build
+  script:
+    - echo "Creating backend ECR repository..."
+    - |
+      aws ecr describe-repositories \
+        --repository-names $BACKEND_REPO \
+        --region $AWS_DEFAULT_REGION 2>/dev/null || \
+      aws ecr create-repository \
+        --repository-name $BACKEND_REPO \
+        --region $AWS_DEFAULT_REGION
+    
+    - echo "Logging into ECR..."
+    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+    
+    - echo "Building backend Docker image..."
+    - docker build -t $BACKEND_REPO:$IMAGE_TAG .
+    
+    - echo "Tagging backend image..."
+    - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    
+    - echo "Pushing backend image to ECR..."
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    
+    - echo "✅ Backend image pushed successfully!"
+  only:
+    - main
+
+# ==================== DEPLOY BACKEND INFRASTRUCTURE ====================
+deploy-backend-infra:
+  stage: deploy
+  script:
+    - echo "Creating CloudFormation template..."
+    - |
+      cat > backend-template.yaml << 'EOF'
+      AWSTemplateFormatVersion: '2010-09-09'
+      Description: 'Backend infrastructure - VPC, ECS Fargate, ALB for backend service'
+
+      Parameters:
+        BackendImage:
+          Type: String
+          Description: Backend Docker image URI from ECR
+
+      Resources:
+        # ==================== VPC ====================
+        VPC:
+          Type: AWS::EC2::VPC
+          Properties:
+            CidrBlock: 10.0.0.0/16
+            EnableDnsHostnames: true
+            EnableDnsSupport: true
+            Tags:
+              - Key: Name
+                Value: backend-vpc
+
+        InternetGateway:
+          Type: AWS::EC2::InternetGateway
+          Properties:
+            Tags:
+              - Key: Name
+                Value: backend-igw
+
+        AttachGateway:
+          Type: AWS::EC2::VPCGatewayAttachment
+          Properties:
+            VpcId: !Ref VPC
+            InternetGatewayId: !Ref InternetGateway
+
+        PublicSubnet1:
+          Type: AWS::EC2::Subnet
+          Properties:
+            VpcId: !Ref VPC
+            CidrBlock: 10.0.1.0/24
+            AvailabilityZone: !Select [0, !GetAZs '']
+            MapPublicIpOnLaunch: true
+            Tags:
+              - Key: Name
+                Value: backend-public-subnet-1
+
+        PublicSubnet2:
+          Type: AWS::EC2::Subnet
+          Properties:
+            VpcId: !Ref VPC
+            CidrBlock: 10.0.2.0/24
+            AvailabilityZone: !Select [1, !GetAZs '']
+            MapPublicIpOnLaunch: true
+            Tags:
+              - Key: Name
+                Value: backend-public-subnet-2
+
+        PrivateSubnet1:
+          Type: AWS::EC2::Subnet
+          Properties:
+            VpcId: !Ref VPC
+            CidrBlock: 10.0.11.0/24
+            AvailabilityZone: !Select [0, !GetAZs '']
+            Tags:
+              - Key: Name
+                Value: backend-private-subnet-1
+
+        PrivateSubnet2:
+          Type: AWS::EC2::Subnet
+          Properties:
+            VpcId: !Ref VPC
+            CidrBlock: 10.0.12.0/24
+            AvailabilityZone: !Select [1, !GetAZs '']
+            Tags:
+              - Key: Name
+                Value: backend-private-subnet-2
+
+        PublicRouteTable:
+          Type: AWS::EC2::RouteTable
+          Properties:
+            VpcId: !Ref VPC
+            Tags:
+              - Key: Name
+                Value: backend-public-rt
+
+        PublicRoute:
+          Type: AWS::EC2::Route
+          DependsOn: AttachGateway
+          Properties:
+            RouteTableId: !Ref PublicRouteTable
+            DestinationCidrBlock: 0.0.0.0/0
+            GatewayId: !Ref InternetGateway
+
+        PublicSubnet1RouteTableAssociation:
+          Type: AWS::EC2::SubnetRouteTableAssociation
+          Properties:
+            SubnetId: !Ref PublicSubnet1
+            RouteTableId: !Ref PublicRouteTable
+
+        PublicSubnet2RouteTableAssociation:
+          Type: AWS::EC2::SubnetRouteTableAssociation
+          Properties:
+            SubnetId: !Ref PublicSubnet2
+            RouteTableId: !Ref PublicRouteTable
+
+        # ==================== Security Groups ====================
+        BackendALBSecurityGroup:
+          Type: AWS::EC2::SecurityGroup
+          Properties:
+            GroupName: backend-alb-sg
+            GroupDescription: Security group for backend ALB
+            VpcId: !Ref VPC
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: 80
+                ToPort: 80
+                CidrIp: 0.0.0.0/0
+            SecurityGroupEgress:
+              - IpProtocol: -1
+                CidrIp: 0.0.0.0/0
+            Tags:
+              - Key: Name
+                Value: backend-alb-sg
+
+        BackendTaskSecurityGroup:
+          Type: AWS::EC2::SecurityGroup
+          Properties:
+            GroupName: backend-task-sg
+            GroupDescription: Security group for backend ECS tasks
+            VpcId: !Ref VPC
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: 5000
+                ToPort: 5000
+                SourceSecurityGroupId: !Ref BackendALBSecurityGroup
+            SecurityGroupEgress:
+              - IpProtocol: -1
+                CidrIp: 0.0.0.0/0
+            Tags:
+              - Key: Name
+                Value: backend-task-sg
+
+        # ==================== ECS ====================
+        ECSCluster:
+          Type: AWS::ECS::Cluster
+          Properties:
+            ClusterName: backend-cluster
+            Tags:
+              - Key: Name
+                Value: backend-cluster
+
+        ECSTaskExecutionRole:
+          Type: AWS::IAM::Role
+          Properties:
+            RoleName: backend-ecs-execution-role
+            AssumeRolePolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Principal:
+                    Service: ecs-tasks.amazonaws.com
+                  Action: sts:AssumeRole
+            ManagedPolicyArns:
+              - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+        ECSTaskRole:
+          Type: AWS::IAM::Role
+          Properties:
+            RoleName: backend-ecs-task-role
+            AssumeRolePolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Principal:
+                    Service: ecs-tasks.amazonaws.com
+                  Action: sts:AssumeRole
+
+        BackendLogGroup:
+          Type: AWS::Logs::LogGroup
+          Properties:
+            LogGroupName: /ecs/backend-task
+            RetentionInDays: 7
+
+        BackendTaskDefinition:
+          Type: AWS::ECS::TaskDefinition
+          Properties:
+            Family: backend-task
+            NetworkMode: awsvpc
+            RequiresCompatibilities:
+              - FARGATE
+            Cpu: '256'
+            Memory: '512'
+            ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+            TaskRoleArn: !GetAtt ECSTaskRole.Arn
+            ContainerDefinitions:
+              - Name: backend-container
+                Image: !Ref BackendImage
+                Essential: true
+                PortMappings:
+                  - ContainerPort: 5000
+                    Protocol: tcp
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-group: !Ref BackendLogGroup
+                    awslogs-region: !Ref AWS::Region
+                    awslogs-stream-prefix: backend
+
+        # ==================== Load Balancer ====================
+        BackendALB:
+          Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+          Properties:
+            Name: backend-alb
+            Type: application
+            Scheme: internet-facing
+            IpAddressType: ipv4
+            Subnets:
+              - !Ref PublicSubnet1
+              - !Ref PublicSubnet2
+            SecurityGroups:
+              - !Ref BackendALBSecurityGroup
+            Tags:
+              - Key: Name
+                Value: backend-alb
+
+        BackendTargetGroup:
+          Type: AWS::ElasticLoadBalancingV2::TargetGroup
+          Properties:
+            Name: backend-tg
+            Port: 5000
+            Protocol: HTTP
+            VpcId: !Ref VPC
+            TargetType: ip
+            HealthCheckEnabled: true
+            HealthCheckPath: /
+            HealthCheckProtocol: HTTP
+            HealthCheckIntervalSeconds: 30
+            HealthCheckTimeoutSeconds: 5
+            HealthyThresholdCount: 2
+            UnhealthyThresholdCount: 3
+
+        BackendListener:
+          Type: AWS::ElasticLoadBalancingV2::Listener
+          Properties:
+            LoadBalancerArn: !Ref BackendALB
+            Port: 80
+            Protocol: HTTP
+            DefaultActions:
+              - Type: forward
+                TargetGroupArn: !Ref BackendTargetGroup
+
+        # ==================== ECS Service ====================
+        BackendService:
+          Type: AWS::ECS::Service
+          DependsOn: BackendListener
+          Properties:
+            ServiceName: backend-service
+            Cluster: !Ref ECSCluster
+            TaskDefinition: !Ref BackendTaskDefinition
+            DesiredCount: 1
+            LaunchType: FARGATE
+            NetworkConfiguration:
+              AwsvpcConfiguration:
+                AssignPublicIp: ENABLED
+                Subnets:
+                  - !Ref PublicSubnet1
+                  - !Ref PublicSubnet2
+                SecurityGroups:
+                  - !Ref BackendTaskSecurityGroup
+            LoadBalancers:
+              - ContainerName: backend-container
+                ContainerPort: 5000
+                TargetGroupArn: !Ref BackendTargetGroup
+
+      Outputs:
+        VPCId:
+          Description: Backend VPC ID
+          Value: !Ref VPC
+        BackendURL:
+          Description: Backend Service URL
+          Value: !Sub 'http://${BackendALB.DNSName}'
+        ClusterName:
+          Description: ECS Cluster Name
+          Value: !Ref ECSCluster
+      EOF
+    
+    - echo "========================================="
+    - echo "Deploying Backend CloudFormation Stack"
+    - echo "Stack Name: $BACKEND_STACK_NAME"
+    - echo "Backend Image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - echo "========================================="
+    
+    - |
+      aws cloudformation deploy \
+        --stack-name $BACKEND_STACK_NAME \
+        --template-file backend-template.yaml \
+        --capabilities CAPABILITY_NAMED_IAM \
+        --parameter-overrides \
+          BackendImage=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
+        --no-fail-on-empty-changeset
+    
+    - echo "✅ Backend infrastructure deployed!"
+    - echo ""
+    - echo "========================================="
+    - echo "BACKEND OUTPUTS:"
+    - echo "========================================="
+    - aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query 'Stacks[0].Outputs' --output table
+    - echo ""
+    - echo "🎉 Backend deployment complete!"
+  only:
+    - main
+  needs:
+    - build-backend

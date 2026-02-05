@@ -81,12 +81,7 @@ deploy-backend:
                   - ContainerPort: 5000
       EOF
 
-    - aws cloudformation deploy \
-        --stack-name "$BACKEND_STACK" \
-        --template-file backend-infra.yaml \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides BackendImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
-        --no-fail-on-empty-changeset
+    - aws cloudformation deploy --stack-name "$BACKEND_STACK" --template-file backend-infra.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides BackendImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" --no-fail-on-empty-changeset
   needs:
     - build-backend
   only:

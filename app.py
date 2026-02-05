@@ -3,9 +3,11 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 
+# Load .env ONLY for local/dev
 if os.getenv("FLASK_ENV") != "production":
     load_dotenv()
 
+# ---------------- Imports ----------------
 from auth import auth
 from cart import cart
 from products import products
@@ -13,7 +15,6 @@ from orders import orders
 from admin import admin
 from chatbot import chatbot
 
-from create_tables import create_tables
 from error_handlers import (
     register_error_handlers,
     setup_logging,
@@ -22,26 +23,52 @@ from error_handlers import (
 )
 from security import limiter, SecurityHeaders
 
+# ---------------- App Init ----------------
 app = Flask(__name__)
 
+# ---------------- Config ----------------
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fallback-secret-key")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "fallback-jwt-secret")
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
 
+# ---------------- CORS ----------------
 CORS(app, origins=["*"])
+
+# ---------------- Extensions ----------------
 limiter.init_app(app)
 
+# ---------------- Logging & Errors ----------------
 setup_logging(app)
 register_error_handlers(app)
 register_api_exception_handler(app)
 log_request_info(app)
 
+# ---------------- Security Headers ----------------
 @app.after_request
 def after_request(response):
     return SecurityHeaders.add_security_headers(response)
 
+# ---------------- Blueprints ----------------
 app.register_blueprint(auth, url_prefix="/api")
 app.register_blueprint(cart, url_prefix="/api/cart")
 app.register_blueprint(products, url_prefix="/api/products")
 app.register_blueprint(orders, url_prefix="/api/orders")
-app.register_blueprint(admin, url_prefix
+app.register_blueprint(admin, url_prefix="/api/admin")
+app.register_blueprint(chatbot, url_prefix="/api/chatbot")
+
+# ---------------- Health (REQUIRED FOR ALB) ----------------
+@app.route("/", methods=["GET"])
+def home():
+    return {"status": "ok", "service": "backend"}, 200
+
+@app.route("/health", methods=["GET"])
+def health():
+    return {"status": "healthy"}, 200
+
+# ---------------- Run ----------------
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 5000)),
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    )

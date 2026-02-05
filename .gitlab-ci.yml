@@ -5,11 +5,11 @@ stages:
 variables:
   REGION: "us-east-1"
   STACK_NAME: "ecommerce-infra-stack"
-  # Replace with your AWS Account ID
-  ECR_URL: "${AWS_ACCOUNT_ID}.dkr.ecr.${REGION.amazonaws.com"
+  # FIXED: Added the missing closing brace for the REGION variable
+  ECR_URL: "${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
   BACKEND_REPO: "ecommerce-backend"
-  # Placeholder for Frontend image if not yet built
-  FRONTEND_IMAGE: "802341561172.dkr.ecr.us-east-1.amazonaws.com/ecommerce-frontend:latest"
+  # Placeholder image for the first run
+  FRONTEND_IMAGE: "${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/ecommerce-frontend:latest"
 
 before_script:
   - apk add --no-cache aws-cli

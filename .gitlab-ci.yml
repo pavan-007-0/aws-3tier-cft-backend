@@ -21,13 +21,21 @@ build-backend:
     - aws sts get-caller-identity
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" --region "$AWS_DEFAULT_REGION" \
-      || aws ecr create-repository --repository-name "$BACKEND_REPO" --region "$AWS_DEFAULT_REGION"
+    # ECR repo (safe check)
+    - |
+      aws ecr describe-repositories \
+        --repository-names "$BACKEND_REPO" \
+        --region "$AWS_DEFAULT_REGION" \
+      || aws ecr create-repository \
+        --repository-name "$BACKEND_REPO" \
+        --region "$AWS_DEFAULT_REGION"
 
+    # Login to ECR
     - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" \
       | docker login --username AWS --password-stdin \
         "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
+    # Build & push image
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
     - docker tag "$BACKEND_REPO:$IMAGE_TAG" \
         "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
@@ -42,10 +50,11 @@ deploy-backend:
     - apk add --no-cache aws-cli
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
+    # Generate backend infra dynamically
     - |
       cat << 'EOF' > backend-infra.yaml
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB
+      Description: Backend ECS Fargate (minimal working)
 
       Parameters:
         BackendImageURI:
@@ -74,7 +83,8 @@ deploy-backend:
             Cpu: "256"
             Memory: "512"
             NetworkMode: awsvpc
-            RequiresCompatibilities: [FARGATE]
+            RequiresCompatibilities:
+              - FARGATE
             ExecutionRoleArn: !GetAtt ExecutionRole.Arn
             ContainerDefinitions:
               - Name: backend
@@ -83,6 +93,7 @@ deploy-backend:
                   - ContainerPort: 5000
       EOF
 
+    # Deploy stack
     - aws cloudformation deploy \
         --stack-name "$BACKEND_STACK" \
         --template-file backend-infra.yaml \

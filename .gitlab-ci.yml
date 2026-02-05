@@ -1,7 +1,8 @@
-image: docker:24
+image: amazon/aws-cli:2
 
 services:
-  - docker:24-dind
+  - name: docker:24-dind
+    command: ["--tls=false"]
 
 variables:
   DOCKER_TLS_CERTDIR: ""
@@ -15,11 +16,11 @@ stages:
   - deploy
 
 before_script:
-  - apk add --no-cache aws-cli
+  - aws --version
+  - docker --version
   - aws sts get-caller-identity
-  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   - echo "AWS Account: $AWS_ACCOUNT_ID"
-  - echo "Region: $AWS_DEFAULT_REGION"
 
 build-backend:
   stage: build
@@ -34,14 +35,14 @@ build-backend:
 
     - |
       aws ecr get-login-password --region $AWS_DEFAULT_REGION \
-      | docker login \
-        --username AWS \
-        --password-stdin \
+      | docker login --username AWS --password-stdin \
         $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
     - docker build -t $BACKEND_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker tag $BACKEND_REPO:$IMAGE_TAG \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker push \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
   only:
     - main
 
@@ -56,12 +57,6 @@ deploy-backend:
         --parameter-overrides \
           BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
         --no-fail-on-empty-changeset
-
-    - |
-      aws cloudformation describe-stacks \
-        --stack-name $BACKEND_STACK_NAME \
-        --query "Stacks[0].Outputs" \
-        --output table
   needs:
     - build-backend
   only:

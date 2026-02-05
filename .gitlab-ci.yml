@@ -31,7 +31,7 @@ build-backend:
     - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
     - echo "Pushing backend image to ECR..."
     - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - echo "✅ Backend image pushed successfully!"
+    - echo "Backend image pushed successfully!"
   only:
     - main
 
@@ -39,245 +39,223 @@ deploy-backend:
   stage: deploy
   script:
     - echo "Creating CloudFormation template..."
-    - |
-      cat > backend-cfn.yaml <<'CFNTEMPLATE'
-      AWSTemplateFormatVersion: '2010-09-09'
-      Description: 'Backend ECS Fargate Infrastructure'
-      Parameters:
-        BackendImageURI:
-          Type: String
-          Description: Backend Docker image URI
-      Resources:
-        VPC:
-          Type: AWS::EC2::VPC
-          Properties:
-            CidrBlock: 10.0.0.0/16
-            EnableDnsHostnames: true
-            EnableDnsSupport: true
-            Tags:
-              - Key: Name
-                Value: backend-vpc
-        InternetGateway:
-          Type: AWS::EC2::InternetGateway
-        VPCGatewayAttachment:
-          Type: AWS::EC2::VPCGatewayAttachment
-          Properties:
-            VpcId: !Ref VPC
-            InternetGatewayId: !Ref InternetGateway
-        PublicSubnet1:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.0.1.0/24
-            AvailabilityZone: !Select [0, !GetAZs '']
-            MapPublicIpOnLaunch: true
-        PublicSubnet2:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.0.2.0/24
-            AvailabilityZone: !Select [1, !GetAZs '']
-            MapPublicIpOnLaunch: true
-        PrivateSubnet1:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.0.11.0/24
-            AvailabilityZone: !Select [0, !GetAZs '']
-        PrivateSubnet2:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.0.12.0/24
-            AvailabilityZone: !Select [1, !GetAZs '']
-        PublicRouteTable:
-          Type: AWS::EC2::RouteTable
-          Properties:
-            VpcId: !Ref VPC
-        PublicRoute:
-          Type: AWS::EC2::Route
-          DependsOn: VPCGatewayAttachment
-          Properties:
-            RouteTableId: !Ref PublicRouteTable
-            DestinationCidrBlock: 0.0.0.0/0
-            GatewayId: !Ref InternetGateway
-        SubnetRouteTableAssociation1:
-          Type: AWS::EC2::SubnetRouteTableAssociation
-          Properties:
-            SubnetId: !Ref PublicSubnet1
-            RouteTableId: !Ref PublicRouteTable
-        SubnetRouteTableAssociation2:
-          Type: AWS::EC2::SubnetRouteTableAssociation
-          Properties:
-            SubnetId: !Ref PublicSubnet2
-            RouteTableId: !Ref PublicRouteTable
-        ALBSecurityGroup:
-          Type: AWS::EC2::SecurityGroup
-          Properties:
-            GroupDescription: Allow HTTP from internet
-            VpcId: !Ref VPC
-            SecurityGroupIngress:
-              - IpProtocol: tcp
-                FromPort: 80
-                ToPort: 80
-                CidrIp: 0.0.0.0/0
-            SecurityGroupEgress:
-              - IpProtocol: -1
-                CidrIp: 0.0.0.0/0
-        TaskSecurityGroup:
-          Type: AWS::EC2::SecurityGroup
-          Properties:
-            GroupDescription: Allow traffic from ALB
-            VpcId: !Ref VPC
-            SecurityGroupIngress:
-              - IpProtocol: tcp
-                FromPort: 5000
-                ToPort: 5000
-                SourceSecurityGroupId: !Ref ALBSecurityGroup
-            SecurityGroupEgress:
-              - IpProtocol: -1
-                CidrIp: 0.0.0.0/0
-        ECSCluster:
-          Type: AWS::ECS::Cluster
-          Properties:
-            ClusterName: backend-cluster
-        TaskExecutionRole:
-          Type: AWS::IAM::Role
-          Properties:
-            AssumeRolePolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Principal:
-                    Service: ecs-tasks.amazonaws.com
-                  Action: sts:AssumeRole
-            ManagedPolicyArns:
-              - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-        TaskRole:
-          Type: AWS::IAM::Role
-          Properties:
-            AssumeRolePolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Principal:
-                    Service: ecs-tasks.amazonaws.com
-                  Action: sts:AssumeRole
-        LogGroup:
-          Type: AWS::Logs::LogGroup
-          Properties:
-            LogGroupName: /ecs/backend
-            RetentionInDays: 7
-        TaskDefinition:
-          Type: AWS::ECS::TaskDefinition
-          Properties:
-            Family: backend-task
-            NetworkMode: awsvpc
-            RequiresCompatibilities:
-              - FARGATE
-            Cpu: '256'
-            Memory: '512'
-            ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-            TaskRoleArn: !GetAtt TaskRole.Arn
-            ContainerDefinitions:
-              - Name: backend
-                Image: !Ref BackendImageURI
-                Essential: true
-                PortMappings:
-                  - ContainerPort: 5000
-                    Protocol: tcp
-                LogConfiguration:
-                  LogDriver: awslogs
-                  Options:
-                    awslogs-group: !Ref LogGroup
-                    awslogs-region: !Ref AWS::Region
-                    awslogs-stream-prefix: backend
-        LoadBalancer:
-          Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-          Properties:
-            Name: backend-alb
-            Type: application
-            Scheme: internet-facing
-            Subnets:
-              - !Ref PublicSubnet1
-              - !Ref PublicSubnet2
-            SecurityGroups:
-              - !Ref ALBSecurityGroup
-        TargetGroup:
-          Type: AWS::ElasticLoadBalancingV2::TargetGroup
-          Properties:
-            Name: backend-tg
-            Port: 5000
-            Protocol: HTTP
-            VpcId: !Ref VPC
-            TargetType: ip
-            HealthCheckEnabled: true
-            HealthCheckPath: /
-            HealthCheckIntervalSeconds: 60
-            HealthCheckTimeoutSeconds: 30
-            HealthyThresholdCount: 2
-            UnhealthyThresholdCount: 5
-            Matcher:
-              HttpCode: 200-499
-        Listener:
-          Type: AWS::ElasticLoadBalancingV2::Listener
-          Properties:
-            LoadBalancerArn: !Ref LoadBalancer
-            Port: 80
-            Protocol: HTTP
-            DefaultActions:
-              - Type: forward
-                TargetGroupArn: !Ref TargetGroup
-        Service:
-          Type: AWS::ECS::Service
-          DependsOn: Listener
-          Properties:
-            ServiceName: backend-service
-            Cluster: !Ref ECSCluster
-            TaskDefinition: !Ref TaskDefinition
-            DesiredCount: 1
-            LaunchType: FARGATE
-            HealthCheckGracePeriodSeconds: 300
-            NetworkConfiguration:
-              AwsvpcConfiguration:
-                AssignPublicIp: ENABLED
-                Subnets:
-                  - !Ref PublicSubnet1
-                  - !Ref PublicSubnet2
-                SecurityGroups:
-                  - !Ref TaskSecurityGroup
-            LoadBalancers:
-              - ContainerName: backend
-                ContainerPort: 5000
-                TargetGroupArn: !Ref TargetGroup
-      Outputs:
-        LoadBalancerURL:
-          Description: Backend ALB URL
-          Value: !Sub 'http://${LoadBalancer.DNSName}'
-        ClusterName:
-          Value: !Ref ECSCluster
-        LogGroupName:
-          Value: !Ref LogGroup
-      CFNTEMPLATE
+    - cat > cfn.yaml <<ENDOFTEMPLATE
+    - "AWSTemplateFormatVersion: '2010-09-09'"
+    - "Description: 'Backend ECS Fargate Infrastructure'"
+    - "Parameters:"
+    - "  BackendImageURI:"
+    - "    Type: String"
+    - "Resources:"
+    - "  VPC:"
+    - "    Type: AWS::EC2::VPC"
+    - "    Properties:"
+    - "      CidrBlock: 10.0.0.0/16"
+    - "      EnableDnsHostnames: true"
+    - "      EnableDnsSupport: true"
+    - "  InternetGateway:"
+    - "    Type: AWS::EC2::InternetGateway"
+    - "  VPCGatewayAttachment:"
+    - "    Type: AWS::EC2::VPCGatewayAttachment"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "      InternetGatewayId: !Ref InternetGateway"
+    - "  PublicSubnet1:"
+    - "    Type: AWS::EC2::Subnet"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "      CidrBlock: 10.0.1.0/24"
+    - "      AvailabilityZone: !Select [0, !GetAZs '']"
+    - "      MapPublicIpOnLaunch: true"
+    - "  PublicSubnet2:"
+    - "    Type: AWS::EC2::Subnet"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "      CidrBlock: 10.0.2.0/24"
+    - "      AvailabilityZone: !Select [1, !GetAZs '']"
+    - "      MapPublicIpOnLaunch: true"
+    - "  PrivateSubnet1:"
+    - "    Type: AWS::EC2::Subnet"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "      CidrBlock: 10.0.11.0/24"
+    - "      AvailabilityZone: !Select [0, !GetAZs '']"
+    - "  PrivateSubnet2:"
+    - "    Type: AWS::EC2::Subnet"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "      CidrBlock: 10.0.12.0/24"
+    - "      AvailabilityZone: !Select [1, !GetAZs '']"
+    - "  PublicRouteTable:"
+    - "    Type: AWS::EC2::RouteTable"
+    - "    Properties:"
+    - "      VpcId: !Ref VPC"
+    - "  PublicRoute:"
+    - "    Type: AWS::EC2::Route"
+    - "    DependsOn: VPCGatewayAttachment"
+    - "    Properties:"
+    - "      RouteTableId: !Ref PublicRouteTable"
+    - "      DestinationCidrBlock: 0.0.0.0/0"
+    - "      GatewayId: !Ref InternetGateway"
+    - "  SubnetRouteTableAssociation1:"
+    - "    Type: AWS::EC2::SubnetRouteTableAssociation"
+    - "    Properties:"
+    - "      SubnetId: !Ref PublicSubnet1"
+    - "      RouteTableId: !Ref PublicRouteTable"
+    - "  SubnetRouteTableAssociation2:"
+    - "    Type: AWS::EC2::SubnetRouteTableAssociation"
+    - "    Properties:"
+    - "      SubnetId: !Ref PublicSubnet2"
+    - "      RouteTableId: !Ref PublicRouteTable"
+    - "  ALBSecurityGroup:"
+    - "    Type: AWS::EC2::SecurityGroup"
+    - "    Properties:"
+    - "      GroupDescription: Allow HTTP from internet"
+    - "      VpcId: !Ref VPC"
+    - "      SecurityGroupIngress:"
+    - "        - IpProtocol: tcp"
+    - "          FromPort: 80"
+    - "          ToPort: 80"
+    - "          CidrIp: 0.0.0.0/0"
+    - "      SecurityGroupEgress:"
+    - "        - IpProtocol: -1"
+    - "          CidrIp: 0.0.0.0/0"
+    - "  TaskSecurityGroup:"
+    - "    Type: AWS::EC2::SecurityGroup"
+    - "    Properties:"
+    - "      GroupDescription: Allow traffic from ALB"
+    - "      VpcId: !Ref VPC"
+    - "      SecurityGroupIngress:"
+    - "        - IpProtocol: tcp"
+    - "          FromPort: 5000"
+    - "          ToPort: 5000"
+    - "          SourceSecurityGroupId: !Ref ALBSecurityGroup"
+    - "      SecurityGroupEgress:"
+    - "        - IpProtocol: -1"
+    - "          CidrIp: 0.0.0.0/0"
+    - "  ECSCluster:"
+    - "    Type: AWS::ECS::Cluster"
+    - "    Properties:"
+    - "      ClusterName: backend-cluster"
+    - "  TaskExecutionRole:"
+    - "    Type: AWS::IAM::Role"
+    - "    Properties:"
+    - "      AssumeRolePolicyDocument:"
+    - "        Version: '2012-10-17'"
+    - "        Statement:"
+    - "          - Effect: Allow"
+    - "            Principal:"
+    - "              Service: ecs-tasks.amazonaws.com"
+    - "            Action: sts:AssumeRole"
+    - "      ManagedPolicyArns:"
+    - "        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+    - "  TaskRole:"
+    - "    Type: AWS::IAM::Role"
+    - "    Properties:"
+    - "      AssumeRolePolicyDocument:"
+    - "        Version: '2012-10-17'"
+    - "        Statement:"
+    - "          - Effect: Allow"
+    - "            Principal:"
+    - "              Service: ecs-tasks.amazonaws.com"
+    - "            Action: sts:AssumeRole"
+    - "  LogGroup:"
+    - "    Type: AWS::Logs::LogGroup"
+    - "    Properties:"
+    - "      LogGroupName: /ecs/backend"
+    - "      RetentionInDays: 7"
+    - "  TaskDefinition:"
+    - "    Type: AWS::ECS::TaskDefinition"
+    - "    Properties:"
+    - "      Family: backend-task"
+    - "      NetworkMode: awsvpc"
+    - "      RequiresCompatibilities:"
+    - "        - FARGATE"
+    - "      Cpu: '256'"
+    - "      Memory: '512'"
+    - "      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn"
+    - "      TaskRoleArn: !GetAtt TaskRole.Arn"
+    - "      ContainerDefinitions:"
+    - "        - Name: backend"
+    - "          Image: !Ref BackendImageURI"
+    - "          Essential: true"
+    - "          PortMappings:"
+    - "            - ContainerPort: 5000"
+    - "              Protocol: tcp"
+    - "          LogConfiguration:"
+    - "            LogDriver: awslogs"
+    - "            Options:"
+    - "              awslogs-group: !Ref LogGroup"
+    - "              awslogs-region: !Ref 'AWS::Region'"
+    - "              awslogs-stream-prefix: backend"
+    - "  LoadBalancer:"
+    - "    Type: AWS::ElasticLoadBalancingV2::LoadBalancer"
+    - "    Properties:"
+    - "      Name: backend-alb"
+    - "      Type: application"
+    - "      Scheme: internet-facing"
+    - "      Subnets:"
+    - "        - !Ref PublicSubnet1"
+    - "        - !Ref PublicSubnet2"
+    - "      SecurityGroups:"
+    - "        - !Ref ALBSecurityGroup"
+    - "  TargetGroup:"
+    - "    Type: AWS::ElasticLoadBalancingV2::TargetGroup"
+    - "    Properties:"
+    - "      Name: backend-tg"
+    - "      Port: 5000"
+    - "      Protocol: HTTP"
+    - "      VpcId: !Ref VPC"
+    - "      TargetType: ip"
+    - "      HealthCheckEnabled: true"
+    - "      HealthCheckPath: /"
+    - "      HealthCheckIntervalSeconds: 60"
+    - "      HealthCheckTimeoutSeconds: 30"
+    - "      HealthyThresholdCount: 2"
+    - "      UnhealthyThresholdCount: 5"
+    - "      Matcher:"
+    - "        HttpCode: 200-499"
+    - "  Listener:"
+    - "    Type: AWS::ElasticLoadBalancingV2::Listener"
+    - "    Properties:"
+    - "      LoadBalancerArn: !Ref LoadBalancer"
+    - "      Port: 80"
+    - "      Protocol: HTTP"
+    - "      DefaultActions:"
+    - "        - Type: forward"
+    - "          TargetGroupArn: !Ref TargetGroup"
+    - "  Service:"
+    - "    Type: AWS::ECS::Service"
+    - "    DependsOn: Listener"
+    - "    Properties:"
+    - "      ServiceName: backend-service"
+    - "      Cluster: !Ref ECSCluster"
+    - "      TaskDefinition: !Ref TaskDefinition"
+    - "      DesiredCount: 1"
+    - "      LaunchType: FARGATE"
+    - "      HealthCheckGracePeriodSeconds: 300"
+    - "      NetworkConfiguration:"
+    - "        AwsvpcConfiguration:"
+    - "          AssignPublicIp: ENABLED"
+    - "          Subnets:"
+    - "            - !Ref PublicSubnet1"
+    - "            - !Ref PublicSubnet2"
+    - "          SecurityGroups:"
+    - "            - !Ref TaskSecurityGroup"
+    - "      LoadBalancers:"
+    - "        - ContainerName: backend"
+    - "          ContainerPort: 5000"
+    - "          TargetGroupArn: !Ref TargetGroup"
+    - "Outputs:"
+    - "  LoadBalancerURL:"
+    - "    Value: !Sub 'http://\${LoadBalancer.DNSName}'"
+    - "  ClusterName:"
+    - "    Value: !Ref ECSCluster"
+    - ENDOFTEMPLATE
     - echo "Deploying CloudFormation stack..."
-    - |
-      aws cloudformation deploy \
-        --stack-name $BACKEND_STACK_NAME \
-        --template-file backend-cfn.yaml \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
-        --no-fail-on-empty-changeset
-    - echo "✅ Deployment complete!"
-    - echo ""
-    - echo "========================================="
+    - aws cloudformation deploy --stack-name $BACKEND_STACK_NAME --template-file cfn.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG --no-fail-on-empty-changeset
+    - echo "Deployment complete!"
     - aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query 'Stacks[0].Outputs' --output table
-    - echo "========================================="
-    - echo ""
-    - echo "⚠️  IMPORTANT: Make sure your app.py has:"
-    - echo "app.run(host='0.0.0.0', port=5000)"
-    - echo ""
-    - echo "Check logs with:"
-    - echo "aws logs tail /ecs/backend --follow --region us-east-1"
+    - echo "Check logs at /ecs/backend in CloudWatch"
   needs:
     - build-backend
   only:

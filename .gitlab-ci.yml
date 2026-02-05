@@ -1,8 +1,7 @@
 image: amazon/aws-cli:2
 
 services:
-  - name: docker:24-dind
-    command: ["--tls=false"]
+  - docker:24-dind
 
 variables:
   DOCKER_TLS_CERTDIR: ""
@@ -22,26 +21,12 @@ build-backend:
     - docker --version
     - aws sts get-caller-identity
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    - echo "AWS Account: $AWS_ACCOUNT_ID"
-
-    - |
-      aws ecr describe-repositories \
-        --repository-names $BACKEND_REPO \
-        --region $AWS_DEFAULT_REGION \
-      || aws ecr create-repository \
-        --repository-name $BACKEND_REPO \
-        --region $AWS_DEFAULT_REGION
-
-    - |
-      aws ecr get-login-password --region $AWS_DEFAULT_REGION \
-      | docker login --username AWS --password-stdin \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-
+    - echo AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID
+    - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_DEFAULT_REGION || aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_DEFAULT_REGION
+    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
     - docker build -t $BACKEND_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_REPO:$IMAGE_TAG \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - docker push \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
   only:
     - main
 
@@ -49,15 +34,7 @@ deploy-backend:
   stage: deploy
   script:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-    - |
-      aws cloudformation deploy \
-        --stack-name $BACKEND_STACK_NAME \
-        --template-file backend-template.yaml \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-          BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
-        --no-fail-on-empty-changeset
+    - aws cloudformation deploy --stack-name $BACKEND_STACK_NAME --template-file backend-template.yaml --capabilities CAPABILITY_NAMED_IAM --parameter-overrides BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG --no-fail-on-empty-changeset
   needs:
     - build-backend
   only:

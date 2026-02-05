@@ -3,49 +3,39 @@ stages:
   - deploy
 
 variables:
-  AWS_DEFAULT_REGION: "us-east-1"
-  ECR_REPOSITORY_NAME: "ecommerce-backend"
-  ECR_ACCOUNT_ID: "$ECR_ACCOUNT_ID"
-  ECS_STACK_NAME: "ecommerce-ecs-stack"
-  CFN_TEMPLATE_FILE: "infra/ecs-infra.yaml"
+  REGION: "us-east-1"
+  STACK_NAME: "ecommerce-infra-stack"
+  # Replace with your AWS Account ID
+  ECR_URL: "${AWS_ACCOUNT_ID}.dkr.ecr.${REGION.amazonaws.com"
+  BACKEND_REPO: "ecommerce-backend"
+  # Placeholder for Frontend image if not yet built
+  FRONTEND_IMAGE: "802341561172.dkr.ecr.us-east-1.amazonaws.com/ecommerce-frontend:latest"
+
+before_script:
+  - apk add --no-cache aws-cli
+  - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URL
 
 build_backend:
   stage: build
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  variables:
-    DOCKER_DRIVER: overlay2
   script:
-    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
-    - export IMAGE_TAG="$CI_COMMIT_SHORT_SHA"
-    - export IMAGE_URI="$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
-    - docker build -t "$IMAGE_URI" .
-    - docker push "$IMAGE_URI"
-    - echo "IMAGE_URI=$IMAGE_URI" > image.env
-  artifacts:
-    reports:
-      dotenv: image.env
-  only:
-    - main
-    - master
+    - docker build -t $ECR_URL/$BACKEND_REPO:$CI_COMMIT_SHA .
+    - docker push $ECR_URL/$BACKEND_REPO:$CI_COMMIT_SHA
+    - docker tag $ECR_URL/$BACKEND_REPO:$CI_COMMIT_SHA $ECR_URL/$BACKEND_REPO:latest
+    - docker push $ECR_URL/$BACKEND_REPO:latest
 
-deploy_backend:
+deploy_infra:
   stage: deploy
-  image: amazon/aws-cli:2.17.0
-  dependencies:
-    - build_backend
+  image: 
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
   script:
-    - source image.env
-    - aws --version
-    - aws cloudformation deploy \
-        --stack-name "$ECS_STACK_NAME" \
-        --template-file "$CFN_TEMPLATE_FILE" \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-          BackendImageURI="$IMAGE_URI" \
-          FrontendImageURI="placeholder-frontend-image" \
-        --region "$AWS_DEFAULT_REGION"
-  only:
-    - main
-    - master
+    - aws cloudformation deploy 
+      --template-file ecs-infra.yaml 
+      --stack-name $STACK_NAME 
+      --parameter-overrides 
+        BackendImageURI=$ECR_URL/$BACKEND_REPO:$CI_COMMIT_SHA 
+        FrontendImageURI=$FRONTEND_IMAGE
+      --capabilities CAPABILITY_NAMED_IAM

@@ -15,16 +15,15 @@ stages:
   - build
   - deploy
 
-before_script:
-  - aws --version
-  - docker --version
-  - aws sts get-caller-identity
-  - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-  - echo "AWS Account: $AWS_ACCOUNT_ID"
-
 build-backend:
   stage: build
   script:
+    - aws --version
+    - docker --version
+    - aws sts get-caller-identity
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    - echo "AWS Account: $AWS_ACCOUNT_ID"
+
     - |
       aws ecr describe-repositories \
         --repository-names $BACKEND_REPO \
@@ -49,6 +48,8 @@ build-backend:
 deploy-backend:
   stage: deploy
   script:
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
     - |
       aws cloudformation deploy \
         --stack-name $BACKEND_STACK_NAME \

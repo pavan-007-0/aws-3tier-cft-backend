@@ -24,11 +24,20 @@ before_script:
 build-backend:
   stage: build
   script:
-    - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_DEFAULT_REGION ||
-      aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_DEFAULT_REGION
+    - |
+      aws ecr describe-repositories \
+        --repository-names $BACKEND_REPO \
+        --region $AWS_DEFAULT_REGION \
+      || aws ecr create-repository \
+        --repository-name $BACKEND_REPO \
+        --region $AWS_DEFAULT_REGION
 
-    - aws ecr get-login-password --region $AWS_DEFAULT_REGION |
-      docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+    - |
+      aws ecr get-login-password --region $AWS_DEFAULT_REGION \
+      | docker login \
+        --username AWS \
+        --password-stdin \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
     - docker build -t $BACKEND_REPO:$IMAGE_TAG .
     - docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
@@ -39,7 +48,8 @@ build-backend:
 deploy-backend:
   stage: deploy
   script:
-    - aws cloudformation deploy \
+    - |
+      aws cloudformation deploy \
         --stack-name $BACKEND_STACK_NAME \
         --template-file backend-template.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
@@ -47,7 +57,8 @@ deploy-backend:
           BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
         --no-fail-on-empty-changeset
 
-    - aws cloudformation describe-stacks \
+    - |
+      aws cloudformation describe-stacks \
         --stack-name $BACKEND_STACK_NAME \
         --query "Stacks[0].Outputs" \
         --output table

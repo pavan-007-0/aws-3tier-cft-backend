@@ -1,20 +1,25 @@
 FROM python:3.10-slim
 
-# Prevent python from writing pyc files
+# Prevent Python from writing .pyc files and buffer logs
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies (safe minimal)
-RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+# Install minimal system dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies first (better layer caching)
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application source
 COPY . .
 
+# Expose backend port
 EXPOSE 5000
 
+# Run the application (Flask must bind to 0.0.0.0)
 CMD ["python", "app.py"]

@@ -1,5 +1,3 @@
-image: amazon/aws-cli:2.17.0
-
 stages:
   - build
   - deploy
@@ -7,13 +5,9 @@ stages:
 variables:
   AWS_DEFAULT_REGION: "us-east-1"
   ECR_REPOSITORY_NAME: "ecommerce-backend"
+  ECR_ACCOUNT_ID: "$ECR_ACCOUNT_ID"
   ECS_STACK_NAME: "ecommerce-ecs-stack"
-  CFN_TEMPLATE_FILE: "infra/ecs-infra.yaml"  # path inside repo
-  BACKEND_CONTAINER_PORT: "5000"
-
-before_script:
-  - aws --version
-  - eval $(aws ecr get-login --no-include-email --region "$AWS_DEFAULT_REGION")
+  CFN_TEMPLATE_FILE: "infra/ecs-infra.yaml"
 
 build_backend:
   stage: build
@@ -23,11 +17,9 @@ build_backend:
   variables:
     DOCKER_DRIVER: overlay2
   script:
-    - echo "Logging in to ECR"
     - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
     - export IMAGE_TAG="$CI_COMMIT_SHORT_SHA"
     - export IMAGE_URI="$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
-    - echo "Building image $IMAGE_URI"
     - docker build -t "$IMAGE_URI" .
     - docker push "$IMAGE_URI"
     - echo "IMAGE_URI=$IMAGE_URI" > image.env
@@ -40,11 +32,12 @@ build_backend:
 
 deploy_backend:
   stage: deploy
+  image: amazon/aws-cli:2.17.0
   dependencies:
     - build_backend
   script:
     - source image.env
-    - echo "Deploying stack $ECS_STACK_NAME with backend image $IMAGE_URI"
+    - aws --version
     - aws cloudformation deploy \
         --stack-name "$ECS_STACK_NAME" \
         --template-file "$CFN_TEMPLATE_FILE" \

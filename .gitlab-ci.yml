@@ -21,18 +21,13 @@ build-backend:
     - aws sts get-caller-identity
     - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    - aws ecr describe-repositories --repository-names $BACKEND_REPO --region $AWS_DEFAULT_REGION \
-      || aws ecr create-repository --repository-name $BACKEND_REPO --region $AWS_DEFAULT_REGION
+    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" --region "$AWS_DEFAULT_REGION" || aws ecr create-repository --repository-name "$BACKEND_REPO" --region "$AWS_DEFAULT_REGION"
 
-    - aws ecr get-login-password --region $AWS_DEFAULT_REGION \
-      | docker login --username AWS --password-stdin \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
-    - docker build -t $BACKEND_REPO:$IMAGE_TAG .
-    - docker tag $BACKEND_REPO:$IMAGE_TAG \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
-    - docker push \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+    - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
+    - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
   only:
     - main
 
@@ -42,7 +37,6 @@ deploy-backend:
     - apk add --no-cache aws-cli
     - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    # 🔹 Generate backend infra dynamically
     - |
       cat > backend-infra.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
@@ -53,12 +47,12 @@ deploy-backend:
           Type: String
 
       Resources:
-        Cluster:
+        BackendCluster:
           Type: AWS::ECS::Cluster
           Properties:
             ClusterName: backend-cluster
 
-        ExecutionRole:
+        TaskExecutionRole:
           Type: AWS::IAM::Role
           Properties:
             AssumeRolePolicyDocument:
@@ -71,14 +65,15 @@ deploy-backend:
             ManagedPolicyArns:
               - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
-        TaskDefinition:
+        BackendTaskDefinition:
           Type: AWS::ECS::TaskDefinition
           Properties:
             Cpu: "256"
             Memory: "512"
             NetworkMode: awsvpc
-            RequiresCompatibilities: [FARGATE]
-            ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+            RequiresCompatibilities:
+              - FARGATE
+            ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
             ContainerDefinitions:
               - Name: backend
                 Image: !Ref BackendImageURI
@@ -87,11 +82,10 @@ deploy-backend:
       EOF
 
     - aws cloudformation deploy \
-        --stack-name $BACKEND_STACK \
+        --stack-name "$BACKEND_STACK" \
         --template-file backend-infra.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-          BackendImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG \
+        --parameter-overrides BackendImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
         --no-fail-on-empty-changeset
   needs:
     - build-backend

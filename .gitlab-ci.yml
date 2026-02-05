@@ -1,107 +1,58 @@
-image: docker:24
-
-services:
-  - docker:24-dind
-
-variables:
-  DOCKER_TLS_CERTDIR: ""
-  AWS_DEFAULT_REGION: us-east-1
-  BACKEND_REPO: backend-repo
-  IMAGE_TAG: latest
-  BACKEND_STACK: backend-stack
+image: amazon/aws-cli:2.17.0
 
 stages:
   - build
   - deploy
 
-build-backend:
+variables:
+  AWS_DEFAULT_REGION: "us-east-1"
+  ECR_REPOSITORY_NAME: "ecommerce-backend"
+  ECS_STACK_NAME: "ecommerce-ecs-stack"
+  CFN_TEMPLATE_FILE: "infra/ecs-infra.yaml"  # path inside repo
+  BACKEND_CONTAINER_PORT: "5000"
+
+before_script:
+  - aws --version
+  - eval $(aws ecr get-login --no-include-email --region "$AWS_DEFAULT_REGION")
+
+build_backend:
   stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_DRIVER: overlay2
   script:
-    - apk add --no-cache aws-cli
-    - aws sts get-caller-identity
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-    # Ensure ECR repo exists (SAFE)
-    - |
-      aws ecr describe-repositories \
-        --repository-names "$BACKEND_REPO" \
-        --region "$AWS_DEFAULT_REGION" \
-      || aws ecr create-repository \
-        --repository-name "$BACKEND_REPO" \
-        --region "$AWS_DEFAULT_REGION"
-
-    # Login to ECR (NON-INTERACTIVE, CORRECT)
-    - |
-      aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | \
-      docker login --username AWS --password-stdin \
-      "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
-
-    # Build & push image
-    - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
-    - docker tag "$BACKEND_REPO:$IMAGE_TAG" \
-        "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-    - docker push \
-        "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - echo "Logging in to ECR"
+    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+    - export IMAGE_TAG="$CI_COMMIT_SHORT_SHA"
+    - export IMAGE_URI="$ECR_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
+    - echo "Building image $IMAGE_URI"
+    - docker build -t "$IMAGE_URI" .
+    - docker push "$IMAGE_URI"
+    - echo "IMAGE_URI=$IMAGE_URI" > image.env
+  artifacts:
+    reports:
+      dotenv: image.env
   only:
     - main
+    - master
 
-deploy-backend:
+deploy_backend:
   stage: deploy
+  dependencies:
+    - build_backend
   script:
-    - apk add --no-cache aws-cli
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-    # Generate CloudFormation template dynamically
-    - |
-      cat << 'EOF' > backend-infra.yaml
-      AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate (minimal stable stack)
-
-      Parameters:
-        BackendImageURI:
-          Type: String
-
-      Resources:
-        ECSCluster:
-          Type: AWS::ECS::Cluster
-
-        ExecutionRole:
-          Type: AWS::IAM::Role
-          Properties:
-            AssumeRolePolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Principal:
-                    Service: ecs-tasks.amazonaws.com
-                  Action: sts:AssumeRole
-            ManagedPolicyArns:
-              - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
-        TaskDefinition:
-          Type: AWS::ECS::TaskDefinition
-          Properties:
-            Cpu: "256"
-            Memory: "512"
-            NetworkMode: awsvpc
-            RequiresCompatibilities:
-              - FARGATE
-            ExecutionRoleArn: !GetAtt ExecutionRole.Arn
-            ContainerDefinitions:
-              - Name: backend
-                Image: !Ref BackendImageURI
-                PortMappings:
-                  - ContainerPort: 5000
-      EOF
-
-    # Deploy CloudFormation stack
+    - source image.env
+    - echo "Deploying stack $ECS_STACK_NAME with backend image $IMAGE_URI"
     - aws cloudformation deploy \
-        --stack-name "$BACKEND_STACK" \
-        --template-file backend-infra.yaml \
+        --stack-name "$ECS_STACK_NAME" \
+        --template-file "$CFN_TEMPLATE_FILE" \
         --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides BackendImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
-        --no-fail-on-empty-changeset
-  needs:
-    - build-backend
+        --parameter-overrides \
+          BackendImageURI="$IMAGE_URI" \
+          FrontendImageURI="placeholder-frontend-image" \
+        --region "$AWS_DEFAULT_REGION"
   only:
     - main
+    - master

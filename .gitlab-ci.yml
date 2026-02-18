@@ -136,9 +136,9 @@ deploy-backend:
                   - ContainerPort: 5000
                 Environment:
                   - Name: DB_HOST
-                    Value: !Ref DBHost
+                    Value: database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com
                   - Name: DB_NAME
-                    Value: !Ref DBName
+                    Value: ecommerce_db
                 Secrets:
                   # 🔐 RDS SECRET (CORRECT FORMAT)
                   - Name: DB_USER

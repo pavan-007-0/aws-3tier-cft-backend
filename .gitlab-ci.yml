@@ -24,12 +24,11 @@ build-backend:
   stage: build
   script:
     - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
-    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+    - aws ecr get-login-password | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
     - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
     - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-  only:
-    - main
+  only: [main]
 
 # ================= DEPLOY =================
 deploy-backend:
@@ -39,11 +38,18 @@ deploy-backend:
     - |
       cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB
+      Description: ECS Backend + RDS (NO NAT, NO PRIVATE SUBNET)
 
       Parameters:
         ImageURI:
           Type: String
+        DBUser:
+          Type: String
+          Default: admin
+        DBPassword:
+          Type: String
+          NoEcho: true
+          Default: StrongPass123!
 
       Resources:
         VPC:
@@ -56,7 +62,7 @@ deploy-backend:
         IGW:
           Type: AWS::EC2::InternetGateway
 
-        IGWAttach:
+        AttachIGW:
           Type: AWS::EC2::VPCGatewayAttachment
           Properties:
             VpcId: !Ref VPC
@@ -85,19 +91,19 @@ deploy-backend:
 
         Route:
           Type: AWS::EC2::Route
-          DependsOn: IGWAttach
+          DependsOn: AttachIGW
           Properties:
             RouteTableId: !Ref RouteTable
             DestinationCidrBlock: 0.0.0.0/0
             GatewayId: !Ref IGW
 
-        SubnetART:
+        SubnetARoute:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
             SubnetId: !Ref SubnetA
             RouteTableId: !Ref RouteTable
 
-        SubnetBRT:
+        SubnetBRoute:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
             SubnetId: !Ref SubnetB
@@ -114,16 +120,39 @@ deploy-backend:
                 ToPort: 80
                 CidrIp: 0.0.0.0/0
 
-        TaskSG:
+        BackendSG:
           Type: AWS::EC2::SecurityGroup
           Properties:
-            GroupDescription: ECS Task SG
+            GroupDescription: Backend ECS SG
             VpcId: !Ref VPC
             SecurityGroupIngress:
               - IpProtocol: tcp
                 FromPort: 5000
                 ToPort: 5000
                 SourceSecurityGroupId: !Ref ALBSG
+
+        RDSSG:
+          Type: AWS::EC2::SecurityGroup
+          Properties:
+            GroupDescription: RDS SG
+            VpcId: !Ref VPC
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: 3306
+                ToPort: 3306
+                SourceSecurityGroupId: !Ref BackendSG
+
+        DB:
+          Type: AWS::RDS::DBInstance
+          Properties:
+            Engine: mysql
+            DBInstanceClass: db.t3.micro
+            AllocatedStorage: 20
+            MasterUsername: !Ref DBUser
+            MasterUserPassword: !Ref DBPassword
+            VPCSecurityGroups: [!Ref RDSSG]
+            PubliclyAccessible: true
+            BackupRetentionPeriod: 0
 
         Cluster:
           Type: AWS::ECS::Cluster
@@ -140,13 +169,12 @@ deploy-backend:
                   Action: sts:AssumeRole
             ManagedPolicyArns:
               - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
 
-        TaskDefinition:
+        TaskDef:
           Type: AWS::ECS::TaskDefinition
           Properties:
-            Cpu: "256"
-            Memory: "512"
+            Cpu: 256
+            Memory: 512
             NetworkMode: awsvpc
             RequiresCompatibilities: [FARGATE]
             ExecutionRoleArn: !GetAtt ExecutionRole.Arn
@@ -155,6 +183,13 @@ deploy-backend:
                 Image: !Ref ImageURI
                 PortMappings:
                   - ContainerPort: 5000
+                Environment:
+                  - Name: DB_HOST
+                    Value: !GetAtt DB.Endpoint.Address
+                  - Name: DB_USER
+                    Value: !Ref DBUser
+                  - Name: DB_PASSWORD
+                    Value: !Ref DBPassword
 
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -189,12 +224,12 @@ deploy-backend:
             Cluster: !Ref Cluster
             LaunchType: FARGATE
             DesiredCount: 1
-            TaskDefinition: !Ref TaskDefinition
+            TaskDefinition: !Ref TaskDef
             NetworkConfiguration:
               AwsvpcConfiguration:
                 AssignPublicIp: ENABLED
                 Subnets: [!Ref SubnetA, !Ref SubnetB]
-                SecurityGroups: [!Ref TaskSG]
+                SecurityGroups: [!Ref BackendSG]
             LoadBalancers:
               - ContainerName: backend
                 ContainerPort: 5000
@@ -211,5 +246,4 @@ deploy-backend:
         --template-file backend.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
         --parameter-overrides ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-  only:
-    - main
+  only: [main]

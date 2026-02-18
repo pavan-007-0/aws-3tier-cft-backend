@@ -37,7 +37,7 @@ deploy-backend:
   stage: deploy
   needs: ["build-backend"]
   script:
-    # 🔴 FIX ECS START FAILURE — ENSURE LOG GROUP EXISTS
+    # ✅ GUARANTEE LOG GROUP EXISTS (FIXES TaskFailedToStart)
     - |
       aws logs describe-log-groups \
         --log-group-name-prefix "$LOG_GROUP_NAME" \
@@ -50,7 +50,7 @@ deploy-backend:
     - |
       cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: ECS Backend (RDS + App Secrets via Secrets Manager)
+      Description: ECS Backend (Fargate + ALB + RDS + Secrets Manager)
 
       Parameters:
         ImageURI:
@@ -140,14 +140,18 @@ deploy-backend:
                   - Name: DB_NAME
                     Value: !Ref DBName
                 Secrets:
+                  # 🔐 RDS SECRET (CORRECT FORMAT)
                   - Name: DB_USER
-                    ValueFrom: !Sub "${RDSSecretArn}:username"
+                    ValueFrom: !Sub "${RDSSecretArn}:username::"
                   - Name: DB_PASSWORD
-                    ValueFrom: !Sub "${RDSSecretArn}:password"
+                    ValueFrom: !Sub "${RDSSecretArn}:password::"
+
+                  # 🔐 APP SECRET
                   - Name: JWT_SECRET_KEY
-                    ValueFrom: !Sub "${AppSecretArn}:JWT_SECRET_KEY"
+                    ValueFrom: !Sub "${AppSecretArn}:JWT_SECRET_KEY::"
                   - Name: SECRET_KEY
-                    ValueFrom: !Sub "${AppSecretArn}:SECRET_KEY"
+                    ValueFrom: !Sub "${AppSecretArn}:SECRET_KEY::"
+
                 LogConfiguration:
                   LogDriver: awslogs
                   Options:

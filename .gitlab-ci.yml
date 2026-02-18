@@ -19,7 +19,7 @@ before_script:
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# ================= BUILD & PUSH =================
+# ---------------- BUILD & PUSH ----------------
 build-backend:
   stage: build
   script:
@@ -36,16 +36,15 @@ build-backend:
       docker login --username AWS --password-stdin \
       "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
-    - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
+    - docker build -t ${BACKEND_REPO}:${IMAGE_TAG} .
 
-    - export IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-
-    - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$IMAGE_URI"
-    - docker push "$IMAGE_URI"
+    - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+    - docker tag ${BACKEND_REPO}:${IMAGE_TAG} ${IMAGE_URI}
+    - docker push ${IMAGE_URI}
   only:
     - main
 
-# ================= DEPLOY =================
+# ---------------- DEPLOY ----------------
 deploy-backend:
   stage: deploy
   needs: ["build-backend"]
@@ -53,7 +52,7 @@ deploy-backend:
     - |
       cat > backend-infra.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB + RDS Secrets
+      Description: Backend ECS Fargate with ALB
 
       Parameters:
         ImageURI:
@@ -171,15 +170,15 @@ deploy-backend:
                 Environment:
                   - Name: FLASK_ENV
                     Value: production
-                Secrets:
-                  - Name: DB_HOST
-                    ValueFrom: "arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:host::"
-                  - Name: DB_USER
-                    ValueFrom: "arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:username::"
-                  - Name: DB_PASSWORD
-                    ValueFrom: "arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:password::"
                   - Name: DB_NAME
                     Value: ecommerce_db
+                Secrets:
+                  - Name: DB_HOST
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:host::
+                  - Name: DB_USER
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:username::
+                  - Name: DB_PASSWORD
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:password::
 
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -235,8 +234,7 @@ deploy-backend:
         --stack-name "$BACKEND_STACK" \
         --template-file backend-infra.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-          ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+        --parameter-overrides ImageURI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
 
   only:
     - main

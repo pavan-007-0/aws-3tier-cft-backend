@@ -23,11 +23,12 @@ build-backend:
   stage: build
   script:
     - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
-    - aws ecr get-login-password | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
     - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
     - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-  only: [main]
+  only:
+    - main
 
 # ================= DEPLOY =================
 deploy-backend:
@@ -37,21 +38,20 @@ deploy-backend:
     - |
       cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: ECS Backend using EXISTING VPC + EXISTING RDS
+      Description: ECS Backend (Existing VPC + Existing RDS)
 
       Parameters:
         ImageURI:
           Type: String
         DBHost:
           Type: String
-        DBPort:
-          Type: Number
-          Default: 3306
         DBUser:
           Type: String
         DBPassword:
           Type: String
           NoEcho: true
+        DBName:
+          Type: String
         VpcId:
           Type: String
         PublicSubnetA:
@@ -89,8 +89,8 @@ deploy-backend:
           Properties:
             GroupId: !Ref ExistingRDSSG
             IpProtocol: tcp
-            FromPort: !Ref DBPort
-            ToPort: !Ref DBPort
+            FromPort: 3306
+            ToPort: 3306
             SourceSecurityGroupId: !Ref BackendSG
 
         Cluster:
@@ -125,12 +125,18 @@ deploy-backend:
                 Environment:
                   - Name: DB_HOST
                     Value: !Ref DBHost
-                  - Name: DB_PORT
-                    Value: !Ref DBPort
                   - Name: DB_USER
                     Value: !Ref DBUser
                   - Name: DB_PASSWORD
                     Value: !Ref DBPassword
+                  - Name: DB_NAME
+                    Value: !Ref DBName
+                LogConfiguration:
+                  LogDriver: awslogs
+                  Options:
+                    awslogs-group: /ecs/backend
+                    awslogs-region: us-east-1
+                    awslogs-stream-prefix: ecs
 
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -191,8 +197,10 @@ deploy-backend:
         DBHost="database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com" \
         DBUser="$DB_USER" \
         DBPassword="$DB_PASSWORD" \
+        DBName="ecommerce_db" \
         VpcId="vpc-0c94c781bb54a1008" \
         PublicSubnetA="subnet-0951f168b0769217c" \
         PublicSubnetB="subnet-0a61c37122c11d0f1" \
         ExistingRDSSG="sg-0f5f53246f5b20572"
-  only: [main]
+  only:
+    - main

@@ -37,14 +37,13 @@ build-backend:
       "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
-
-    - export IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-    - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$IMAGE_URI"
-    - docker push "$IMAGE_URI"
+    - docker tag "$BACKEND_REPO:$IMAGE_TAG" \
+        "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
   only:
     - main
 
-# ---------------- DEPLOY INFRA ----------------
+# ---------------- DEPLOY ----------------
 deploy-backend:
   stage: deploy
   needs: ["build-backend"]
@@ -52,7 +51,7 @@ deploy-backend:
     - |
       cat > backend-infra.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB
+      Description: Backend ECS Fargate with ALB + RDS Secrets
 
       Parameters:
         ImageURI:
@@ -62,7 +61,7 @@ deploy-backend:
         VPC:
           Type: AWS::EC2::VPC
           Properties:
-            CidrBlock: 10.0.0.0/16
+            CidrBlock: 10.20.0.0/16
             EnableDnsSupport: true
             EnableDnsHostnames: true
 
@@ -79,7 +78,7 @@ deploy-backend:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.0.1.0/24
+            CidrBlock: 10.20.1.0/24
             MapPublicIpOnLaunch: true
             AvailabilityZone: us-east-1a
 
@@ -87,7 +86,7 @@ deploy-backend:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.0.2.0/24
+            CidrBlock: 10.20.2.0/24
             MapPublicIpOnLaunch: true
             AvailabilityZone: us-east-1b
 
@@ -167,6 +166,20 @@ deploy-backend:
                 Image: !Ref ImageURI
                 PortMappings:
                   - ContainerPort: 5000
+
+                Environment:
+                  - Name: DB_HOST
+                    Value: database-1-use1.c7k0u8mcq7i1.us-east-1.rds.amazonaws.com
+                  - Name: DB_NAME
+                    Value: ecommerce_db
+                  - Name: FLASK_ENV
+                    Value: production
+
+                Secrets:
+                  - Name: DB_USER
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62-vXhyjZ:username::
+                  - Name: DB_PASSWORD
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62-vXhyjZ:password::
 
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup

@@ -19,7 +19,7 @@ before_script:
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# ---------------- BUILD & PUSH ----------------
+# ================= BUILD & PUSH IMAGE =================
 build-backend:
   stage: build
   script:
@@ -37,13 +37,13 @@ build-backend:
       "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
-    - docker tag "$BACKEND_REPO:$IMAGE_TAG" \
-        "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
     - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+
   only:
     - main
 
-# ---------------- DEPLOY ----------------
+# ================= DEPLOY ECS + ALB =================
 deploy-backend:
   stage: deploy
   needs: ["build-backend"]
@@ -51,7 +51,7 @@ deploy-backend:
     - |
       cat > backend-infra.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB + RDS Secrets
+      Description: Backend ECS Fargate with ALB
 
       Parameters:
         ImageURI:
@@ -61,61 +61,61 @@ deploy-backend:
         VPC:
           Type: AWS::EC2::VPC
           Properties:
-            CidrBlock: 10.20.0.0/16
+            CidrBlock: 10.50.0.0/16
             EnableDnsSupport: true
             EnableDnsHostnames: true
 
-        IGW:
+        InternetGateway:
           Type: AWS::EC2::InternetGateway
 
-        IGWAttach:
+        AttachIGW:
           Type: AWS::EC2::VPCGatewayAttachment
           Properties:
             VpcId: !Ref VPC
-            InternetGatewayId: !Ref IGW
+            InternetGatewayId: !Ref InternetGateway
 
-        Subnet1:
+        PublicSubnetA:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.20.1.0/24
-            MapPublicIpOnLaunch: true
+            CidrBlock: 10.50.1.0/24
             AvailabilityZone: us-east-1a
+            MapPublicIpOnLaunch: true
 
-        Subnet2:
+        PublicSubnetB:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.20.2.0/24
-            MapPublicIpOnLaunch: true
+            CidrBlock: 10.50.2.0/24
             AvailabilityZone: us-east-1b
+            MapPublicIpOnLaunch: true
 
         RouteTable:
           Type: AWS::EC2::RouteTable
           Properties:
             VpcId: !Ref VPC
 
-        Route:
+        DefaultRoute:
           Type: AWS::EC2::Route
-          DependsOn: IGWAttach
+          DependsOn: AttachIGW
           Properties:
             RouteTableId: !Ref RouteTable
             DestinationCidrBlock: 0.0.0.0/0
-            GatewayId: !Ref IGW
+            GatewayId: !Ref InternetGateway
 
-        Subnet1RT:
+        SubnetARoute:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
-            SubnetId: !Ref Subnet1
+            SubnetId: !Ref PublicSubnetA
             RouteTableId: !Ref RouteTable
 
-        Subnet2RT:
+        SubnetBRoute:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
-            SubnetId: !Ref Subnet2
+            SubnetId: !Ref PublicSubnetB
             RouteTableId: !Ref RouteTable
 
-        ALBSG:
+        ALBSecurityGroup:
           Type: AWS::EC2::SecurityGroup
           Properties:
             GroupDescription: ALB SG
@@ -126,7 +126,7 @@ deploy-backend:
                 ToPort: 80
                 CidrIp: 0.0.0.0/0
 
-        TaskSG:
+        ECSTaskSecurityGroup:
           Type: AWS::EC2::SecurityGroup
           Properties:
             GroupDescription: ECS Task SG
@@ -135,12 +135,12 @@ deploy-backend:
               - IpProtocol: tcp
                 FromPort: 5000
                 ToPort: 5000
-                SourceSecurityGroupId: !Ref ALBSG
+                SourceSecurityGroupId: !Ref ALBSecurityGroup
 
-        Cluster:
+        ECSCluster:
           Type: AWS::ECS::Cluster
 
-        ExecutionRole:
+        TaskExecutionRole:
           Type: AWS::IAM::Role
           Properties:
             AssumeRolePolicyDocument:
@@ -152,82 +152,85 @@ deploy-backend:
                   Action: sts:AssumeRole
             ManagedPolicyArns:
               - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
 
-        TaskDef:
+        TaskDefinition:
           Type: AWS::ECS::TaskDefinition
           Properties:
             Cpu: "256"
             Memory: "512"
             NetworkMode: awsvpc
             RequiresCompatibilities: [FARGATE]
-            ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+            ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
             ContainerDefinitions:
               - Name: backend
                 Image: !Ref ImageURI
                 PortMappings:
                   - ContainerPort: 5000
-
                 Environment:
                   - Name: DB_HOST
                     Value: database-1-use1.c7k0u8mcq7i1.us-east-1.rds.amazonaws.com
+                  - Name: DB_USER
+                    Value: admin
                   - Name: DB_NAME
                     Value: ecommerce_db
-                  - Name: FLASK_ENV
-                    Value: production
-
                 Secrets:
-                  - Name: DB_USER
-                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62-vXhyjZ:username::
                   - Name: DB_PASSWORD
-                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62-vXhyjZ:password::
+                    ValueFrom: arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-06783279-a268-42c4-884b-7f7475c0ad62:password::
 
-        TG:
+        TargetGroup:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
           Properties:
+            VpcId: !Ref VPC
             Port: 5000
             Protocol: HTTP
             TargetType: ip
-            VpcId: !Ref VPC
             HealthCheckPath: /health
 
-        ALB:
+        LoadBalancer:
           Type: AWS::ElasticLoadBalancingV2::LoadBalancer
           Properties:
             Scheme: internet-facing
-            Subnets: [!Ref Subnet1, !Ref Subnet2]
-            SecurityGroups: [!Ref ALBSG]
+            Subnets:
+              - !Ref PublicSubnetA
+              - !Ref PublicSubnetB
+            SecurityGroups:
+              - !Ref ALBSecurityGroup
 
         Listener:
           Type: AWS::ElasticLoadBalancingV2::Listener
           Properties:
-            LoadBalancerArn: !Ref ALB
+            LoadBalancerArn: !Ref LoadBalancer
             Port: 80
             Protocol: HTTP
             DefaultActions:
               - Type: forward
-                TargetGroupArn: !Ref TG
+                TargetGroupArn: !Ref TargetGroup
 
-        Service:
+        ECSService:
           Type: AWS::ECS::Service
           DependsOn: Listener
           Properties:
-            Cluster: !Ref Cluster
+            Cluster: !Ref ECSCluster
             LaunchType: FARGATE
             DesiredCount: 1
-            TaskDefinition: !Ref TaskDef
+            TaskDefinition: !Ref TaskDefinition
             NetworkConfiguration:
               AwsvpcConfiguration:
                 AssignPublicIp: ENABLED
-                Subnets: [!Ref Subnet1, !Ref Subnet2]
-                SecurityGroups: [!Ref TaskSG]
+                Subnets:
+                  - !Ref PublicSubnetA
+                  - !Ref PublicSubnetB
+                SecurityGroups:
+                  - !Ref ECSTaskSecurityGroup
             LoadBalancers:
               - ContainerName: backend
                 ContainerPort: 5000
-                TargetGroupArn: !Ref TG
+                TargetGroupArn: !Ref TargetGroup
 
       Outputs:
         BackendURL:
-          Value: !GetAtt ALB.DNSName
+          Value: !GetAtt LoadBalancer.DNSName
       EOF
 
     - |

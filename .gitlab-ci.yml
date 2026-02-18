@@ -16,7 +16,6 @@ stages:
 
 before_script:
   - apk add --no-cache aws-cli
-  - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 # ================= BUILD =================
@@ -38,82 +37,36 @@ deploy-backend:
     - |
       cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: ECS Backend + RDS (NO NAT, NO PRIVATE SUBNET)
+      Description: ECS Backend using EXISTING VPC + EXISTING RDS
 
       Parameters:
         ImageURI:
           Type: String
+        DBHost:
+          Type: String
+        DBPort:
+          Type: Number
+          Default: 3306
         DBUser:
           Type: String
-          Default: admin
         DBPassword:
           Type: String
           NoEcho: true
-          Default: StrongPass123!
+        VpcId:
+          Type: String
+        PublicSubnetA:
+          Type: String
+        PublicSubnetB:
+          Type: String
+        ExistingRDSSG:
+          Type: String
 
       Resources:
-        VPC:
-          Type: AWS::EC2::VPC
-          Properties:
-            CidrBlock: 10.20.0.0/16
-            EnableDnsSupport: true
-            EnableDnsHostnames: true
-
-        IGW:
-          Type: AWS::EC2::InternetGateway
-
-        AttachIGW:
-          Type: AWS::EC2::VPCGatewayAttachment
-          Properties:
-            VpcId: !Ref VPC
-            InternetGatewayId: !Ref IGW
-
-        SubnetA:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.20.1.0/24
-            AvailabilityZone: us-east-1a
-            MapPublicIpOnLaunch: true
-
-        SubnetB:
-          Type: AWS::EC2::Subnet
-          Properties:
-            VpcId: !Ref VPC
-            CidrBlock: 10.20.2.0/24
-            AvailabilityZone: us-east-1b
-            MapPublicIpOnLaunch: true
-
-        RouteTable:
-          Type: AWS::EC2::RouteTable
-          Properties:
-            VpcId: !Ref VPC
-
-        Route:
-          Type: AWS::EC2::Route
-          DependsOn: AttachIGW
-          Properties:
-            RouteTableId: !Ref RouteTable
-            DestinationCidrBlock: 0.0.0.0/0
-            GatewayId: !Ref IGW
-
-        SubnetARoute:
-          Type: AWS::EC2::SubnetRouteTableAssociation
-          Properties:
-            SubnetId: !Ref SubnetA
-            RouteTableId: !Ref RouteTable
-
-        SubnetBRoute:
-          Type: AWS::EC2::SubnetRouteTableAssociation
-          Properties:
-            SubnetId: !Ref SubnetB
-            RouteTableId: !Ref RouteTable
-
         ALBSG:
           Type: AWS::EC2::SecurityGroup
           Properties:
             GroupDescription: ALB SG
-            VpcId: !Ref VPC
+            VpcId: !Ref VpcId
             SecurityGroupIngress:
               - IpProtocol: tcp
                 FromPort: 80
@@ -124,35 +77,21 @@ deploy-backend:
           Type: AWS::EC2::SecurityGroup
           Properties:
             GroupDescription: Backend ECS SG
-            VpcId: !Ref VPC
+            VpcId: !Ref VpcId
             SecurityGroupIngress:
               - IpProtocol: tcp
                 FromPort: 5000
                 ToPort: 5000
                 SourceSecurityGroupId: !Ref ALBSG
 
-        RDSSG:
-          Type: AWS::EC2::SecurityGroup
+        AllowEcsToRds:
+          Type: AWS::EC2::SecurityGroupIngress
           Properties:
-            GroupDescription: RDS SG
-            VpcId: !Ref VPC
-            SecurityGroupIngress:
-              - IpProtocol: tcp
-                FromPort: 3306
-                ToPort: 3306
-                SourceSecurityGroupId: !Ref BackendSG
-
-        DB:
-          Type: AWS::RDS::DBInstance
-          Properties:
-            Engine: mysql
-            DBInstanceClass: db.t3.micro
-            AllocatedStorage: 20
-            MasterUsername: !Ref DBUser
-            MasterUserPassword: !Ref DBPassword
-            VPCSecurityGroups: [!Ref RDSSG]
-            PubliclyAccessible: true
-            BackupRetentionPeriod: 0
+            GroupId: !Ref ExistingRDSSG
+            IpProtocol: tcp
+            FromPort: !Ref DBPort
+            ToPort: !Ref DBPort
+            SourceSecurityGroupId: !Ref BackendSG
 
         Cluster:
           Type: AWS::ECS::Cluster
@@ -185,7 +124,9 @@ deploy-backend:
                   - ContainerPort: 5000
                 Environment:
                   - Name: DB_HOST
-                    Value: !GetAtt DB.Endpoint.Address
+                    Value: !Ref DBHost
+                  - Name: DB_PORT
+                    Value: !Ref DBPort
                   - Name: DB_USER
                     Value: !Ref DBUser
                   - Name: DB_PASSWORD
@@ -194,7 +135,7 @@ deploy-backend:
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
           Properties:
-            VpcId: !Ref VPC
+            VpcId: !Ref VpcId
             Port: 5000
             Protocol: HTTP
             TargetType: ip
@@ -204,7 +145,7 @@ deploy-backend:
           Type: AWS::ElasticLoadBalancingV2::LoadBalancer
           Properties:
             Scheme: internet-facing
-            Subnets: [!Ref SubnetA, !Ref SubnetB]
+            Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
             SecurityGroups: [!Ref ALBSG]
 
         Listener:
@@ -228,7 +169,7 @@ deploy-backend:
             NetworkConfiguration:
               AwsvpcConfiguration:
                 AssignPublicIp: ENABLED
-                Subnets: [!Ref SubnetA, !Ref SubnetB]
+                Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
                 SecurityGroups: [!Ref BackendSG]
             LoadBalancers:
               - ContainerName: backend
@@ -245,5 +186,13 @@ deploy-backend:
         --stack-name "$STACK_NAME" \
         --template-file backend.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+        --parameter-overrides \
+        ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
+        DBHost="database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com" \
+        DBUser="$DB_USER" \
+        DBPassword="$DB_PASSWORD" \
+        VpcId="vpc-0c94c781bb54a1008" \
+        PublicSubnetA="subnet-0951f168b0769217c" \
+        PublicSubnetB="subnet-0a61c37122c11d0f1" \
+        ExistingRDSSG="sg-0f5f53246f5b20572"
   only: [main]

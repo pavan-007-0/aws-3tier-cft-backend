@@ -9,6 +9,7 @@ variables:
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
   STACK_NAME: backend-stack
+  LOG_GROUP_NAME: /ecs/backend
 
 stages:
   - build
@@ -16,6 +17,7 @@ stages:
 
 before_script:
   - apk add --no-cache aws-cli
+  - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 # ================= BUILD =================
@@ -35,30 +37,39 @@ deploy-backend:
   stage: deploy
   needs: ["build-backend"]
   script:
+    # 🔴 FIX ECS START FAILURE — ENSURE LOG GROUP EXISTS
+    - |
+      aws logs describe-log-groups \
+        --log-group-name-prefix "$LOG_GROUP_NAME" \
+        --region "$AWS_DEFAULT_REGION" \
+      | grep "$LOG_GROUP_NAME" || \
+      aws logs create-log-group \
+        --log-group-name "$LOG_GROUP_NAME" \
+        --region "$AWS_DEFAULT_REGION"
+
     - |
       cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: ECS Backend (Existing VPC + Existing RDS)
+      Description: ECS Backend (RDS + App Secrets via Secrets Manager)
 
       Parameters:
         ImageURI:
           Type: String
         DBHost:
           Type: String
-        DBUser:
-          Type: String
-        DBPassword:
-          Type: String
-          NoEcho: true
         DBName:
           Type: String
         VpcId:
           Type: String
-        PublicSubnetA:
+        SubnetA:
           Type: String
-        PublicSubnetB:
+        SubnetB:
           Type: String
-        ExistingRDSSG:
+        RDSSecurityGroup:
+          Type: String
+        RDSSecretArn:
+          Type: String
+        AppSecretArn:
           Type: String
 
       Resources:
@@ -87,7 +98,7 @@ deploy-backend:
         AllowEcsToRds:
           Type: AWS::EC2::SecurityGroupIngress
           Properties:
-            GroupId: !Ref ExistingRDSSG
+            GroupId: !Ref RDSSecurityGroup
             IpProtocol: tcp
             FromPort: 3306
             ToPort: 3306
@@ -108,6 +119,7 @@ deploy-backend:
                   Action: sts:AssumeRole
             ManagedPolicyArns:
               - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
 
         TaskDef:
           Type: AWS::ECS::TaskDefinition
@@ -125,12 +137,17 @@ deploy-backend:
                 Environment:
                   - Name: DB_HOST
                     Value: !Ref DBHost
-                  - Name: DB_USER
-                    Value: !Ref DBUser
-                  - Name: DB_PASSWORD
-                    Value: !Ref DBPassword
                   - Name: DB_NAME
                     Value: !Ref DBName
+                Secrets:
+                  - Name: DB_USER
+                    ValueFrom: !Sub "${RDSSecretArn}:username"
+                  - Name: DB_PASSWORD
+                    ValueFrom: !Sub "${RDSSecretArn}:password"
+                  - Name: JWT_SECRET_KEY
+                    ValueFrom: !Sub "${AppSecretArn}:JWT_SECRET_KEY"
+                  - Name: SECRET_KEY
+                    ValueFrom: !Sub "${AppSecretArn}:SECRET_KEY"
                 LogConfiguration:
                   LogDriver: awslogs
                   Options:
@@ -151,7 +168,7 @@ deploy-backend:
           Type: AWS::ElasticLoadBalancingV2::LoadBalancer
           Properties:
             Scheme: internet-facing
-            Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+            Subnets: [!Ref SubnetA, !Ref SubnetB]
             SecurityGroups: [!Ref ALBSG]
 
         Listener:
@@ -175,7 +192,7 @@ deploy-backend:
             NetworkConfiguration:
               AwsvpcConfiguration:
                 AssignPublicIp: ENABLED
-                Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+                Subnets: [!Ref SubnetA, !Ref SubnetB]
                 SecurityGroups: [!Ref BackendSG]
             LoadBalancers:
               - ContainerName: backend
@@ -195,12 +212,12 @@ deploy-backend:
         --parameter-overrides \
         ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
         DBHost="database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com" \
-        DBUser="$DB_USER" \
-        DBPassword="$DB_PASSWORD" \
         DBName="ecommerce_db" \
         VpcId="vpc-0c94c781bb54a1008" \
-        PublicSubnetA="subnet-0951f168b0769217c" \
-        PublicSubnetB="subnet-0a61c37122c11d0f1" \
-        ExistingRDSSG="sg-0f5f53246f5b20572"
+        SubnetA="subnet-0951f168b0769217c" \
+        SubnetB="subnet-0a61c37122c11d0f1" \
+        RDSSecurityGroup="sg-0f5f53246f5b20572" \
+        RDSSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL" \
+        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:secrets/app/backend-bkOeNX"
   only:
     - main

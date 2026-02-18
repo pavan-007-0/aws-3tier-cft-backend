@@ -8,7 +8,7 @@ variables:
   AWS_DEFAULT_REGION: us-east-1
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
-  BACKEND_STACK: backend-stack
+  STACK_NAME: backend-stack
 
 stages:
   - build
@@ -19,50 +19,38 @@ before_script:
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# ---------------- BUILD & PUSH ----------------
+# ================= BUILD & PUSH =================
 build-backend:
   stage: build
   script:
-    - |
-      aws ecr describe-repositories \
-        --repository-names "$BACKEND_REPO" \
-        --region "$AWS_DEFAULT_REGION" \
-      || aws ecr create-repository \
-        --repository-name "$BACKEND_REPO" \
-        --region "$AWS_DEFAULT_REGION"
-
-    - |
-      aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | \
-      docker login --username AWS --password-stdin \
-      "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
-
-    - docker build -t ${BACKEND_REPO}:${IMAGE_TAG} .
-
-    - export IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
-    - docker tag ${BACKEND_REPO}:${IMAGE_TAG} ${IMAGE_URI}
-    - docker push ${IMAGE_URI}
+    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
+    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+    - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
+    - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
   only:
     - main
 
-# ---------------- DEPLOY ----------------
+# ================= DEPLOY =================
 deploy-backend:
   stage: deploy
   needs: ["build-backend"]
   script:
     - |
-      cat > backend-infra.yaml << 'EOF'
+      cat > backend.yaml << 'EOF'
       AWSTemplateFormatVersion: "2010-09-09"
-      Description: Backend ECS Fargate with ALB
+      Description: Backend ECS Fargate with ALB + RDS
 
       Parameters:
         ImageURI:
           Type: String
 
       Resources:
+
         VPC:
           Type: AWS::EC2::VPC
           Properties:
-            CidrBlock: 10.1.0.0/16
+            CidrBlock: 10.20.0.0/16
             EnableDnsSupport: true
             EnableDnsHostnames: true
 
@@ -75,21 +63,21 @@ deploy-backend:
             VpcId: !Ref VPC
             InternetGatewayId: !Ref IGW
 
-        Subnet1:
+        SubnetA:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.1.1.0/24
-            MapPublicIpOnLaunch: true
+            CidrBlock: 10.20.1.0/24
             AvailabilityZone: us-east-1a
+            MapPublicIpOnLaunch: true
 
-        Subnet2:
+        SubnetB:
           Type: AWS::EC2::Subnet
           Properties:
             VpcId: !Ref VPC
-            CidrBlock: 10.1.2.0/24
-            MapPublicIpOnLaunch: true
+            CidrBlock: 10.20.2.0/24
             AvailabilityZone: us-east-1b
+            MapPublicIpOnLaunch: true
 
         RouteTable:
           Type: AWS::EC2::RouteTable
@@ -104,16 +92,16 @@ deploy-backend:
             DestinationCidrBlock: 0.0.0.0/0
             GatewayId: !Ref IGW
 
-        Subnet1RT:
+        SubnetART:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
-            SubnetId: !Ref Subnet1
+            SubnetId: !Ref SubnetA
             RouteTableId: !Ref RouteTable
 
-        Subnet2RT:
+        SubnetBRT:
           Type: AWS::EC2::SubnetRouteTableAssociation
           Properties:
-            SubnetId: !Ref Subnet2
+            SubnetId: !Ref SubnetB
             RouteTableId: !Ref RouteTable
 
         ALBSG:
@@ -153,8 +141,9 @@ deploy-backend:
                   Action: sts:AssumeRole
             ManagedPolicyArns:
               - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
 
-        TaskDef:
+        TaskDefinition:
           Type: AWS::ECS::TaskDefinition
           Properties:
             Cpu: "256"
@@ -183,17 +172,17 @@ deploy-backend:
         TG:
           Type: AWS::ElasticLoadBalancingV2::TargetGroup
           Properties:
+            VpcId: !Ref VPC
             Port: 5000
             Protocol: HTTP
             TargetType: ip
-            VpcId: !Ref VPC
             HealthCheckPath: /health
 
         ALB:
           Type: AWS::ElasticLoadBalancingV2::LoadBalancer
           Properties:
             Scheme: internet-facing
-            Subnets: [!Ref Subnet1, !Ref Subnet2]
+            Subnets: [!Ref SubnetA, !Ref SubnetB]
             SecurityGroups: [!Ref ALBSG]
 
         Listener:
@@ -213,11 +202,11 @@ deploy-backend:
             Cluster: !Ref Cluster
             LaunchType: FARGATE
             DesiredCount: 1
-            TaskDefinition: !Ref TaskDef
+            TaskDefinition: !Ref TaskDefinition
             NetworkConfiguration:
               AwsvpcConfiguration:
                 AssignPublicIp: ENABLED
-                Subnets: [!Ref Subnet1, !Ref Subnet2]
+                Subnets: [!Ref SubnetA, !Ref SubnetB]
                 SecurityGroups: [!Ref TaskSG]
             LoadBalancers:
               - ContainerName: backend
@@ -229,12 +218,10 @@ deploy-backend:
           Value: !GetAtt ALB.DNSName
       EOF
 
-    - |
-      aws cloudformation deploy \
-        --stack-name "$BACKEND_STACK" \
-        --template-file backend-infra.yaml \
+    - aws cloudformation deploy \
+        --stack-name $STACK_NAME \
+        --template-file backend.yaml \
         --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides ImageURI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
-
+        --parameter-overrides ImageURI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
   only:
     - main

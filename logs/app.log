@@ -933,3 +933,16 @@
 2026-01-06 09:21:31,911 INFO app Thread-11 (process_request_thread) : Response: 200 - OPTIONS http://localhost:5000/api/chatbot/message
 2026-01-06 09:21:32,175 INFO app Thread-12 (process_request_thread) : POST http://localhost:5000/api/chatbot/message - IP: 127.0.0.1
 2026-01-06 09:21:32,176 INFO app Thread-12 (process_request_thread) : Response: 200 - POST http://localhost:5000/api/chatbot/message
+2026-02-19 18:07:18,703 INFO app MainThread : E-commerce application startup
+2026-02-19 18:07:19,580 INFO app MainThread : E-commerce application startup
+2026-02-19 18:48:31,007 INFO app MainThread : E-commerce application startup
+2026-02-19 18:53:41,811 INFO app MainThread : E-commerce application startup
+2026-02-19 18:53:42,743 INFO app MainThread : E-commerce application startup
+2026-02-19 18:53:53,589 INFO app Thread-3 (process_request_thread) : GET http://10.224.105.96:5000/ - IP: 10.224.105.96
+2026-02-19 18:53:53,594 INFO app Thread-3 (process_request_thread) : Response: 200 - GET http://10.224.105.96:5000/
+2026-02-19 18:53:54,015 INFO app Thread-4 (process_request_thread) : GET http://10.224.105.96:5000/favicon.ico - IP: 10.224.105.96
+2026-02-19 18:53:54,016 INFO app Thread-4 (process_request_thread) : Resource not found: http://10.224.105.96:5000/favicon.ico
+2026-02-19 18:53:54,018 INFO app Thread-4 (process_request_thread) : Response: 404 - GET http://10.224.105.96:5000/favicon.ico
+2026-02-19 19:22:08,591 INFO app MainThread : E-commerce application startup
+2026-02-19 19:22:10,881 INFO app MainThread : E-commerce application startup
+2026-02-19 19:22:55,838 INFO app MainThread : E-commerce application startup

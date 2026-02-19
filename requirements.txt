@@ -9,5 +9,5 @@ Werkzeug==3.0.1
 cryptography==41.0.7
 bcrypt==4.1.2
 marshmallow==3.20.1
-email-validator==2.1.0
+email-validator>=3.0.0
 requests==2.31.0

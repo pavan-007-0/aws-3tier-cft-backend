@@ -214,6 +214,10 @@ class SecurityHeaders:
         # Referrer Policy
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
+        # Cache Control - prevent 10-minute default caching issue
+        # Allow browser cache but validate with server
+        response.headers['Cache-Control'] = 'public, max-age=300, must-revalidate'
+        
         return response
 
 def log_security_event(event_type, user_id=None, ip_address=None, details=None):

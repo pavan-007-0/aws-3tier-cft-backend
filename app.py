@@ -13,7 +13,6 @@ from cart import cart
 from products import products
 from orders import orders
 from admin import admin
-from chatbot import chatbot
 
 from error_handlers import (
     register_error_handlers,
@@ -54,7 +53,6 @@ app.register_blueprint(cart, url_prefix="/api/cart")
 app.register_blueprint(products, url_prefix="/api/products")
 app.register_blueprint(orders, url_prefix="/api/orders")
 app.register_blueprint(admin, url_prefix="/api/admin")
-app.register_blueprint(chatbot, url_prefix="/api/chatbot")
 
 # ---------------- Health (REQUIRED FOR ALB) ----------------
 @app.route("/", methods=["GET"])

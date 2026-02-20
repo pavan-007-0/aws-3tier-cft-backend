@@ -71,6 +71,9 @@ deploy-backend:
           Type: String
         AppSecretArn:
           Type: String
+        CorsOrigins:
+          Type: String
+          Default: "http://localhost:4200"
 
       Resources:
         ALBSG:
@@ -142,7 +145,7 @@ deploy-backend:
                   - Name: FLASK_ENV
                     Value: production
                   - Name: CORS_ORIGINS
-                    Value: http://<FRONTEND-ALB-DNS-NAME>
+                    Value: !Ref CorsOrigins
                 Secrets:
                   # 🔐 RDS SECRET (CORRECT FORMAT)
                   - Name: DB_USER
@@ -213,6 +216,10 @@ deploy-backend:
       EOF
 
     - |
+      FRONTEND_URL=$(aws cloudformation describe-stacks --stack-name frontend-stack --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" --output text || echo "http://localhost:4200")
+      echo "Detected Frontend URL: $FRONTEND_URL"
+
+    - |
       aws cloudformation deploy \
         --stack-name "$STACK_NAME" \
         --template-file backend.yaml \
@@ -226,6 +233,7 @@ deploy-backend:
         SubnetB="subnet-0a61c37122c11d0f1" \
         RDSSecurityGroup="sg-0f5f53246f5b20572" \
         RDSSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL" \
-        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:secrets/app/backend-bkOeNX"
+        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:secrets/app/backend-bkOeNX" \
+        CorsOrigins="http://$FRONTEND_URL"
   only:
     - main

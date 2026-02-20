@@ -31,7 +31,12 @@ app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "fallback-jwt-secret"
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
 
 # ---------------- CORS ----------------
-CORS(app, origins=["*"])
+CORS(app, origins=os.getenv("CORS_ORIGINS", "http://localhost:4200").split(","))
+
+# ---------------- Production Checks ----------------
+if app.config["ENV"] == "production":
+    assert os.getenv("SECRET_KEY"), "SECRET_KEY env var is REQUIRED in production"
+    assert os.getenv("JWT_SECRET_KEY"), "JWT_SECRET_KEY env var is REQUIRED in production"
 
 # ---------------- Extensions ----------------
 limiter.init_app(app)

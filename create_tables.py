@@ -225,11 +225,16 @@ def create_tables():
         INSERT INTO products (name, description, price, compare_price, sku, quantity, category_id, brand, image, featured)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, [
-            ("MacBook Pro 14-inch", "Apple M3 chip, 16GB RAM, 512GB SSD", 1999.00, 2199.00, "MBP-14-M3-16-512", 25, 1, "Apple", "macbook-pro-14.jpg", True),
-            ("AirPods Pro (3rd Gen)", "Active Noise Cancellation, Spatial Audio", 249.00, 279.00, "APP-3GEN", 50, 2, "Apple", "airpods-pro-3.jpg", True),
-            ("Apple Watch Series 9", "GPS + Cellular, 45mm, Midnight Aluminum", 429.00, 459.00, "AWS9-45-MID", 30, 3, "Apple", "apple-watch-s9.jpg", True),
-            ("iPad Air 11-inch", "M2 chip, Wi-Fi, 128GB", 599.00, 649.00, "IPAD-AIR-11-M2", 40, 1, "Apple", "ipad-air-11.jpg", False),
-            ("Magic Keyboard", "For iPad Pro 11-inch and iPad Air", 299.00, 329.00, "MK-IPAD-11", 20, 2, "Apple", "magic-keyboard.jpg", False),
+            ("Bluetooth Earbuds", "Waterproof, Touch controls, Active Noise Cancellation", 1299.00, 1428.00, "BT-EARBUDS-01", 50, 1, "AudioTech", "earbuds.jpg", True),
+            ("Gaming Mouse", "RGB lighting, 6 programmable buttons, 16000 DPI", 899.00, 998.00, "GM-MOUSE-01", 40, 2, "GameGear", "mouse.jpg", True),
+            ("Laptop Stand", "Aluminum, Adjustable height, Ergonomic design", 849.00, 933.00, "LP-STAND-01", 30, 2, "ErgoDesk", "laptopstand.jpg", True),
+            ("Meta Glasses", "AR Smart Glasses, Immersive VR experience", 5999.00, 6598.00, "META-GL-01", 15, 1, "Meta", "glasses.jpg", True),
+            ("Portable Speaker", "360° sound, Waterproof, 12hr battery", 599.00, 699.00, "PT-SPKR-01", 45, 1, "SoundWave", "speaker.jpg", False),
+            ("Power Bank", "20000mAh, Fast charging, USB-C", 499.00, 599.00, "PW-BANK-01", 60, 2, "PowerMax", "powerbank.jpg", False),
+            ("Smart Mobile", "iPhone Pro, Triple camera, A17 Pro chip", 1199.00, 1399.00, "SM-MOB-01", 25, 1, "Apple", "mobile.jpg", True),
+            ("Smart Watch", "GPS + Cellular, Health monitoring, AMOLED display", 429.00, 499.00, "SM-WATCH-01", 35, 3, "WearTech", "smartwatch.jpg", True),
+            ("Webcam HD Pro", "4K Ultra HD, Auto-focus, Streaming ready", 349.00, 399.00, "WC-PRO-01", 30, 1, "StreamCam", "webcam.jpg", False),
+            ("Headphones Pro", "Studio-grade, Over-ear, 40hr battery", 799.00, 899.00, "HP-PRO-01", 20, 1, "SoundMaster", "headphones.jpg", True),
         ])
         conn.commit()
 

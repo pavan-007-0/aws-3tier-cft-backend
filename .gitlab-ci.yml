@@ -139,6 +139,10 @@ deploy-backend:
                     Value: database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com
                   - Name: DB_NAME
                     Value: ecommerce_db
+                  - Name: FLASK_ENV
+                    Value: production
+                  - Name: CORS_ORIGINS
+                    Value: http://<FRONTEND-ALB-DNS-NAME>
                 Secrets:
                   # 🔐 RDS SECRET (CORRECT FORMAT)
                   - Name: DB_USER

@@ -21,5 +21,5 @@ COPY . .
 # Expose backend port
 EXPOSE 5000
 
-# Run the application (Flask must bind to 0.0.0.0)
-CMD ["python", "app.py"]
+# Run with Gunicorn (production WSGI server)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "app:app"]

@@ -233,7 +233,7 @@ deploy-backend:
         SubnetB="subnet-0a61c37122c11d0f1" \
         RDSSecurityGroup="sg-0f5f53246f5b20572" \
         RDSSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL" \
-        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:secrets/app/backend-bkOeNX" \
+        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:app/backend/secrets-0DFyuf" \
         CorsOrigins="http://$FRONTEND_URL"
   only:
     - main

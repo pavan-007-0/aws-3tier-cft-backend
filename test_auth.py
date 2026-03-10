@@ -15,6 +15,12 @@ class TestAuthEndpoints(unittest.TestCase):
         """Set up test client and database"""
         self.app = app
         self.app.config['TESTING'] = True
+        self.app.config['RATELIMIT_ENABLED'] = False
+        
+        # Explicitly disable limiter
+        from security import limiter
+        limiter.enabled = False
+        
         self.client = self.app.test_client()
         
         # Set test environment variables
@@ -34,8 +40,32 @@ class TestAuthEndpoints(unittest.TestCase):
             conn = get_connection()
             cursor = conn.cursor()
             
+            # Disable foreign key checks to safely delete test data
+            cursor.execute("SET FOREIGN_KEY_CHECKS=0")
+            
+            cursor.execute("SELECT id FROM users WHERE email LIKE 'test%@example.com'")
+            user_ids = [str(row[0]) for row in cursor.fetchall()]
+            
+            if user_ids:
+                user_ids_str = ','.join(user_ids)
+                
+                # Delete related records to maintain database cleanliness
+                cursor.execute(f"DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN ({user_ids_str}))")
+                cursor.execute(f"DELETE FROM orders WHERE user_id IN ({user_ids_str})")
+                cursor.execute(f"DELETE FROM cart WHERE user_id IN ({user_ids_str})")
+                try:
+                    cursor.execute(f"DELETE FROM wishlist WHERE user_id IN ({user_ids_str})")
+                except:
+                    pass
+                try:
+                    cursor.execute(f"DELETE FROM auth_tokens WHERE user_id IN ({user_ids_str})")
+                except:
+                    pass
+                
             # Clean up any existing test data
             cursor.execute("DELETE FROM users WHERE email LIKE 'test%@example.com'")
+            
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1")
             conn.commit()
             
             cursor.close()
@@ -49,8 +79,32 @@ class TestAuthEndpoints(unittest.TestCase):
             conn = get_connection()
             cursor = conn.cursor()
             
+            # Disable foreign key checks to safely delete test data
+            cursor.execute("SET FOREIGN_KEY_CHECKS=0")
+            
+            cursor.execute("SELECT id FROM users WHERE email LIKE 'test%@example.com'")
+            user_ids = [str(row[0]) for row in cursor.fetchall()]
+            
+            if user_ids:
+                user_ids_str = ','.join(user_ids)
+                
+                # Delete related records to maintain database cleanliness
+                cursor.execute(f"DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN ({user_ids_str}))")
+                cursor.execute(f"DELETE FROM orders WHERE user_id IN ({user_ids_str})")
+                cursor.execute(f"DELETE FROM cart WHERE user_id IN ({user_ids_str})")
+                try:
+                    cursor.execute(f"DELETE FROM wishlist WHERE user_id IN ({user_ids_str})")
+                except:
+                    pass
+                try:
+                    cursor.execute(f"DELETE FROM auth_tokens WHERE user_id IN ({user_ids_str})")
+                except:
+                    pass
+            
             # Remove test users
             cursor.execute("DELETE FROM users WHERE email LIKE 'test%@example.com'")
+            
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1")
             conn.commit()
             
             cursor.close()

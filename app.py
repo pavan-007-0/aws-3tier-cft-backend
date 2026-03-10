@@ -30,6 +30,9 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fallback-secret-key")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "fallback-jwt-secret")
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
 
+if app.config["ENV"] == "testing":
+    app.config["RATELIMIT_ENABLED"] = False
+
 # ---------------- CORS ----------------
 CORS(app, origins=os.getenv("CORS_ORIGINS", "http://localhost:4200").split(","))
 

@@ -65,45 +65,40 @@ def update_schema():
             else:
                 print(f"❌ Error adding FULLTEXT index: {e}")
         
-        # Update sample products with enhanced data
+        # Update sample products with enhanced data - FIXED to assign correct images
         cursor.execute("""
             UPDATE products SET 
                 image = CASE 
-                    WHEN name LIKE '%MacBook%' THEN 'macbook-pro-14.jpg'
-                    WHEN name LIKE '%AirPods%' THEN 'airpods-pro-3.jpg'
-                    WHEN name LIKE '%Apple Watch%' THEN 'apple-watch-s9.jpg'
-                    WHEN name LIKE '%iPad%' THEN 'ipad-air-11.jpg'
-                    WHEN name LIKE '%Magic Keyboard%' THEN 'magic-keyboard.jpg'
-                    ELSE 'default-product.jpg'
+                    WHEN name LIKE '%Wireless Earbuds%' OR name LIKE '%Earbuds%' THEN '/assets/products/earbuds.jpg'
+                    WHEN name LIKE '%Smart Glasses%' OR name LIKE '%Glasses%' THEN '/assets/products/glasses.jpg'
+                    WHEN name LIKE '%Headphones%' THEN '/assets/products/headphones.jpg'
+                    WHEN name LIKE '%Laptop%' OR name LIKE '%Stand%' THEN '/assets/products/laptopstand.jpg'
+                    WHEN name LIKE '%Mobile%' OR name LIKE '%Phone%' OR name LIKE '%Smartphone%' THEN '/assets/products/mobile.jpg'
+                    WHEN name LIKE '%Mouse%' THEN '/assets/products/mouse.jpg'
+                    WHEN name LIKE '%Power%' OR name LIKE '%Bank%' THEN '/assets/products/powerbank.jpg'
+                    WHEN name LIKE '%Smart Watch%' OR name LIKE '%Watch%' THEN '/assets/products/smartwatch.jpg'
+                    WHEN name LIKE '%Speaker%' THEN '/assets/products/speaker.jpg'
+                    WHEN name LIKE '%Webcam%' OR name LIKE '%Camera%' THEN '/assets/products/webcam.jpg'
+                    ELSE '/assets/products/placeholder.jpg'
                 END,
                 compare_price = CASE 
-                    WHEN name LIKE '%MacBook%' THEN 2199.00
-                    WHEN name LIKE '%AirPods%' THEN 279.00
-                    WHEN name LIKE '%Apple Watch%' THEN 459.00
-                    WHEN name LIKE '%iPad%' THEN 649.00
-                    WHEN name LIKE '%Magic Keyboard%' THEN 329.00
-                    ELSE price * 1.1
+                    WHEN compare_price IS NULL OR compare_price <= price THEN price * 1.15
+                    ELSE compare_price
                 END,
                 sku = CASE 
-                    WHEN name LIKE '%MacBook%' THEN 'MBP-14-M3-16-512'
-                    WHEN name LIKE '%AirPods%' THEN 'APP-3GEN'
-                    WHEN name LIKE '%Apple Watch%' THEN 'AWS9-45-MID'
-                    WHEN name LIKE '%iPad%' THEN 'IPAD-AIR-11-M2'
-                    WHEN name LIKE '%Magic Keyboard%' THEN 'MK-IPAD-11'
-                    ELSE CONCAT('SKU-', id)
+                    WHEN sku IS NULL OR sku = '' THEN CONCAT('SKU-', id, '-', UPPER(SUBSTRING(name, 1, 3)))
+                    ELSE sku
                 END,
-                brand = 'Apple',
                 category_id = CASE 
-                    WHEN name LIKE '%MacBook%' OR name LIKE '%iPad%' THEN 1
-                    WHEN name LIKE '%AirPods%' OR name LIKE '%Magic Keyboard%' THEN 2
-                    WHEN name LIKE '%Apple Watch%' THEN 3
-                    ELSE 1
+                    WHEN category_id IS NULL THEN 1
+                    ELSE category_id
                 END,
                 featured = CASE 
-                    WHEN name LIKE '%MacBook%' OR name LIKE '%AirPods%' OR name LIKE '%Apple Watch%' THEN TRUE
-                    ELSE FALSE
-                END
-            WHERE image IS NULL OR compare_price IS NULL OR sku IS NULL
+                    WHEN featured IS NULL THEN FALSE
+                    ELSE featured
+                END,
+                is_active = TRUE
+            WHERE TRUE
         """)
         
         conn.commit()

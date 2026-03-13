@@ -42,7 +42,7 @@ provision-eks:
   needs: ["build-backend"]
   image: alpine:3.18
   before_script:
-    - apk add --no-cache aws-cli curl bash
+    - apk add --no-cache aws-cli curl bash openssl
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
     # ── Install eksctl ──

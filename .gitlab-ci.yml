@@ -73,12 +73,6 @@ provision-eks:
           - "0.0.0.0/0"
       iam:
         withOIDC: true
-        serviceAccounts:
-          - metadata:
-              name: external-secrets-sa
-              namespace: external-secrets
-            attachPolicyARNs:
-              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
       managedNodeGroups:
         - name: ecommerce-nodes
           instanceType: t3.small

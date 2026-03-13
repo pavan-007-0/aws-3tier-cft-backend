@@ -8,19 +8,21 @@ variables:
   AWS_DEFAULT_REGION: us-east-1
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
-  STACK_NAME: backend-stack
-  LOG_GROUP_NAME: /ecs/backend
+  CLUSTER_NAME: ecommerce-cluster
 
 stages:
   - build
+  - infra
   - deploy
 
 before_script:
-  - apk add --no-cache aws-cli
+  - apk add --no-cache aws-cli curl bash
   - aws sts get-caller-identity
   - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-# ================= BUILD =================
+# ═══════════════════════════════════════════════════════════════
+# STAGE 1 — BUILD & PUSH FLASK IMAGE TO ECR
+# ═══════════════════════════════════════════════════════════════
 build-backend:
   stage: build
   script:
@@ -32,208 +34,342 @@ build-backend:
   only:
     - main
 
-# ================= DEPLOY =================
-deploy-backend:
-  stage: deploy
+# ═══════════════════════════════════════════════════════════════
+# STAGE 2 — PROVISION EKS + INSTALL CONTROLLERS (runs once)
+# ═══════════════════════════════════════════════════════════════
+provision-eks:
+  stage: infra
   needs: ["build-backend"]
+  image: alpine:3.18
+  before_script:
+    - apk add --no-cache aws-cli curl bash
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+    # ── Install eksctl ──
+    - curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /usr/local/bin
+
+    # ── Install kubectl ──
+    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+
+    # ── Install helm ──
+    - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
   script:
-    # ✅ GUARANTEE LOG GROUP EXISTS (FIXES TaskFailedToStart)
+    # ── Write eksctl cluster config inline ──
     - |
-      aws logs describe-log-groups \
-        --log-group-name-prefix "$LOG_GROUP_NAME" \
-        --region "$AWS_DEFAULT_REGION" \
-      | grep "$LOG_GROUP_NAME" || \
-      aws logs create-log-group \
-        --log-group-name "$LOG_GROUP_NAME" \
-        --region "$AWS_DEFAULT_REGION"
-
-    - |
-      cat > backend.yaml << 'EOF'
-      AWSTemplateFormatVersion: "2010-09-09"
-      Description: ECS Backend (Fargate + ALB + RDS + Secrets Manager)
-
-      Parameters:
-        ImageURI:
-          Type: String
-        DBHost:
-          Type: String
-        DBName:
-          Type: String
-        VpcId:
-          Type: String
-        SubnetA:
-          Type: String
-        SubnetB:
-          Type: String
-        RDSSecurityGroup:
-          Type: String
-        RDSSecretArn:
-          Type: String
-        AppSecretArn:
-          Type: String
-        CorsOrigins:
-          Type: String
-          Default: "http://localhost:4200"
-
-      Resources:
-        ALBSG:
-          Type: AWS::EC2::SecurityGroup
-          Properties:
-            GroupDescription: ALB SG
-            VpcId: !Ref VpcId
-            SecurityGroupIngress:
-              - IpProtocol: tcp
-                FromPort: 80
-                ToPort: 80
-                CidrIp: 0.0.0.0/0
-
-        BackendSG:
-          Type: AWS::EC2::SecurityGroup
-          Properties:
-            GroupDescription: Backend ECS SG
-            VpcId: !Ref VpcId
-            SecurityGroupIngress:
-              - IpProtocol: tcp
-                FromPort: 5000
-                ToPort: 5000
-                SourceSecurityGroupId: !Ref ALBSG
-
-        AllowEcsToRds:
-          Type: AWS::EC2::SecurityGroupIngress
-          Properties:
-            GroupId: !Ref RDSSecurityGroup
-            IpProtocol: tcp
-            FromPort: 3306
-            ToPort: 3306
-            SourceSecurityGroupId: !Ref BackendSG
-
-        Cluster:
-          Type: AWS::ECS::Cluster
-
-        ExecutionRole:
-          Type: AWS::IAM::Role
-          Properties:
-            AssumeRolePolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Principal:
-                    Service: ecs-tasks.amazonaws.com
-                  Action: sts:AssumeRole
-            ManagedPolicyArns:
-              - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      cat > eksctl-cluster.yaml << EOF
+      apiVersion: eksctl.io/v1alpha5
+      kind: ClusterConfig
+      metadata:
+        name: ${CLUSTER_NAME}
+        region: ${AWS_DEFAULT_REGION}
+        version: "1.29"
+      vpc:
+        id: vpc-0c94c781bb54a1008
+        subnets:
+          public:
+            us-east-1a:
+              id: subnet-0951f168b0769217c
+            us-east-1b:
+              id: subnet-0a61c37122c11d0f1
+      iam:
+        withOIDC: true
+        serviceAccounts:
+          - metadata:
+              name: external-secrets-sa
+              namespace: external-secrets
+            attachPolicyARNs:
               - arn:aws:iam::aws:policy/SecretsManagerReadWrite
-
-        TaskDef:
-          Type: AWS::ECS::TaskDefinition
-          Properties:
-            Cpu: 256
-            Memory: 512
-            NetworkMode: awsvpc
-            RequiresCompatibilities: [FARGATE]
-            ExecutionRoleArn: !GetAtt ExecutionRole.Arn
-            ContainerDefinitions:
-              - Name: backend
-                Image: !Ref ImageURI
-                PortMappings:
-                  - ContainerPort: 5000
-                Environment:
-                  - Name: DB_HOST
-                    Value: database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com
-                  - Name: DB_NAME
-                    Value: ecommerce_db
-                  - Name: FLASK_ENV
-                    Value: production
-                  - Name: CORS_ORIGINS
-                    Value: !Ref CorsOrigins
-                Secrets:
-                  # 🔐 RDS SECRET (CORRECT FORMAT)
-                  - Name: DB_USER
-                    ValueFrom: !Sub "${RDSSecretArn}:username::"
-                  - Name: DB_PASSWORD
-                    ValueFrom: !Sub "${RDSSecretArn}:password::"
-
-                  # 🔐 APP SECRET
-                  - Name: JWT_SECRET_KEY
-                    ValueFrom: !Sub "${AppSecretArn}:JWT_SECRET_KEY::"
-                  - Name: SECRET_KEY
-                    ValueFrom: !Sub "${AppSecretArn}:SECRET_KEY::"
-
-                LogConfiguration:
-                  LogDriver: awslogs
-                  Options:
-                    awslogs-group: /ecs/backend
-                    awslogs-region: us-east-1
-                    awslogs-stream-prefix: ecs
-
-        TG:
-          Type: AWS::ElasticLoadBalancingV2::TargetGroup
-          Properties:
-            VpcId: !Ref VpcId
-            Port: 5000
-            Protocol: HTTP
-            TargetType: ip
-            HealthCheckPath: /health
-
-        ALB:
-          Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-          Properties:
-            Scheme: internet-facing
-            Subnets: [!Ref SubnetA, !Ref SubnetB]
-            SecurityGroups: [!Ref ALBSG]
-
-        Listener:
-          Type: AWS::ElasticLoadBalancingV2::Listener
-          Properties:
-            LoadBalancerArn: !Ref ALB
-            Port: 80
-            Protocol: HTTP
-            DefaultActions:
-              - Type: forward
-                TargetGroupArn: !Ref TG
-
-        Service:
-          Type: AWS::ECS::Service
-          DependsOn: Listener
-          Properties:
-            Cluster: !Ref Cluster
-            LaunchType: FARGATE
-            DesiredCount: 1
-            TaskDefinition: !Ref TaskDef
-            NetworkConfiguration:
-              AwsvpcConfiguration:
-                AssignPublicIp: ENABLED
-                Subnets: [!Ref SubnetA, !Ref SubnetB]
-                SecurityGroups: [!Ref BackendSG]
-            LoadBalancers:
-              - ContainerName: backend
-                ContainerPort: 5000
-                TargetGroupArn: !Ref TG
-
-      Outputs:
-        BackendURL:
-          Value: !GetAtt ALB.DNSName
+      managedNodeGroups:
+        - name: ecommerce-nodes
+          instanceType: t3.small
+          minSize: 1
+          desiredCapacity: 2
+          maxSize: 4
+          subnets:
+            - subnet-0951f168b0769217c
+            - subnet-0a61c37122c11d0f1
+          iam:
+            attachPolicyARNs:
+              - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+              - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+              - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
       EOF
 
+    # ── Create EKS cluster only if it doesn't exist ──
     - |
-      FRONTEND_URL=$(aws cloudformation describe-stacks --stack-name frontend-stack --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" --output text || echo "http://localhost:4200")
-      echo "Detected Frontend URL: $FRONTEND_URL"
+      if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" > /dev/null 2>&1; then
+        echo "✅ Cluster already exists — skipping creation"
+      else
+        echo "🚀 Creating EKS cluster (this takes ~15 mins)..."
+        eksctl create cluster -f eksctl-cluster.yaml
+        echo "✅ Cluster created"
+      fi
 
+    # ── Connect kubectl to cluster ──
+    - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
+
+    # ── Install AWS Load Balancer Controller (for ALB Ingress) ──
     - |
-      aws cloudformation deploy \
-        --stack-name "$STACK_NAME" \
-        --template-file backend.yaml \
-        --capabilities CAPABILITY_NAMED_IAM \
-        --parameter-overrides \
-        ImageURI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG" \
-        DBHost="database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com" \
-        DBName="ecommerce_db" \
-        VpcId="vpc-0c94c781bb54a1008" \
-        SubnetA="subnet-0951f168b0769217c" \
-        SubnetB="subnet-0a61c37122c11d0f1" \
-        RDSSecurityGroup="sg-0f5f53246f5b20572" \
-        RDSSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL" \
-        AppSecretArn="arn:aws:secretsmanager:us-east-1:088042034531:secret:app/backend/secrets-0DFyuf" \
-        CorsOrigins="http://$FRONTEND_URL"
+      if helm status aws-load-balancer-controller -n kube-system > /dev/null 2>&1; then
+        echo "✅ ALB Controller already installed — skipping"
+      else
+        echo "🚀 Installing AWS Load Balancer Controller..."
+        helm repo add eks https://aws.github.io/eks-charts && helm repo update
+        helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+          -n kube-system \
+          --set clusterName=$CLUSTER_NAME \
+          --set serviceAccount.create=true \
+          --set region=$AWS_DEFAULT_REGION \
+          --set vpcId=vpc-0c94c781bb54a1008
+        echo "✅ ALB Controller installed"
+      fi
+
+    # ── Install External Secrets Operator ──
+    - |
+      if helm status external-secrets -n external-secrets > /dev/null 2>&1; then
+        echo "✅ External Secrets Operator already installed — skipping"
+      else
+        echo "🚀 Installing External Secrets Operator..."
+        helm repo add external-secrets https://charts.external-secrets.io && helm repo update
+        helm upgrade --install external-secrets external-secrets/external-secrets \
+          -n external-secrets \
+          --create-namespace \
+          --set installCRDs=true \
+          --set serviceAccount.name=external-secrets-sa
+        echo "✅ External Secrets Operator installed"
+      fi
+
+    # ── Write and apply External Secrets manifests inline ──
+    - |
+      cat > external-secrets.yaml << EOF
+      apiVersion: external-secrets.io/v1beta1
+      kind: ClusterSecretStore
+      metadata:
+        name: aws-secrets-manager
+      spec:
+        provider:
+          aws:
+            service: SecretsManager
+            region: ${AWS_DEFAULT_REGION}
+            auth:
+              jwt:
+                serviceAccountRef:
+                  name: external-secrets-sa
+                  namespace: external-secrets
+      ---
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: rds-secret
+        namespace: default
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: backend-secrets
+          creationPolicy: Owner
+        data:
+          - secretKey: DB_USER
+            remoteRef:
+              key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL"
+              property: username
+          - secretKey: DB_PASSWORD
+            remoteRef:
+              key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL"
+              property: password
+      ---
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: app-secret
+        namespace: default
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: backend-secrets
+          creationPolicy: Merge
+        data:
+          - secretKey: JWT_SECRET_KEY
+            remoteRef:
+              key: "app/backend/secrets-0DFyuf"
+              property: JWT_SECRET_KEY
+          - secretKey: SECRET_KEY
+            remoteRef:
+              key: "app/backend/secrets-0DFyuf"
+              property: SECRET_KEY
+      EOF
+    - kubectl apply -f external-secrets.yaml
+    - echo "✅ External Secrets applied"
+
+  only:
+    - main
+
+# ═══════════════════════════════════════════════════════════════
+# STAGE 3 — DEPLOY FLASK APP TO EKS
+# ═══════════════════════════════════════════════════════════════
+deploy-backend:
+  stage: deploy
+  needs: ["provision-eks"]
+  image: alpine:3.18
+  before_script:
+    - apk add --no-cache aws-cli curl bash
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+    # ── Install kubectl ──
+    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+
+    # ── Connect kubectl to cluster ──
+    - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
+
+  script:
+    # ── Detect frontend URL for CORS (if already deployed) ──
+    - |
+      FRONTEND_URL=$(kubectl get ingress frontend -n default \
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+      if [ -z "$FRONTEND_URL" ]; then
+        CORS_ORIGINS="http://localhost:4200"
+        echo "⚠️  Frontend not deployed yet — using localhost for CORS"
+      else
+        CORS_ORIGINS="http://$FRONTEND_URL"
+        echo "✅ Frontend detected: $FRONTEND_URL"
+      fi
+
+    # ── Write all K8s manifests inline ──
+    - |
+      cat > backend-manifests.yaml << EOF
+      # ── Deployment ──────────────────────────────────────────
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: backend
+        template:
+          metadata:
+            labels:
+              app: backend
+          spec:
+            containers:
+              - name: backend
+                image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+                imagePullPolicy: Always
+                ports:
+                  - containerPort: 5000
+                env:
+                  - name: DB_HOST
+                    value: "database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com"
+                  - name: DB_NAME
+                    value: "ecommerce_db"
+                  - name: FLASK_ENV
+                    value: "production"
+                  - name: CORS_ORIGINS
+                    value: "${CORS_ORIGINS}"
+                  - name: DB_USER
+                    valueFrom:
+                      secretKeyRef:
+                        name: backend-secrets
+                        key: DB_USER
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: backend-secrets
+                        key: DB_PASSWORD
+                  - name: JWT_SECRET_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: backend-secrets
+                        key: JWT_SECRET_KEY
+                  - name: SECRET_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: backend-secrets
+                        key: SECRET_KEY
+                resources:
+                  requests:
+                    cpu: "125m"
+                    memory: "256Mi"
+                  limits:
+                    cpu: "250m"
+                    memory: "512Mi"
+                livenessProbe:
+                  httpGet:
+                    path: /health
+                    port: 5000
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                readinessProbe:
+                  httpGet:
+                    path: /health
+                    port: 5000
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+      ---
+      # ── Service ──────────────────────────────────────────────
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        type: ClusterIP
+        selector:
+          app: backend
+        ports:
+          - port: 5000
+            targetPort: 5000
+            protocol: TCP
+      ---
+      # ── Ingress (ALB) ─────────────────────────────────────────
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: backend
+        namespace: default
+        annotations:
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/healthcheck-path: /health
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+      spec:
+        rules:
+          - http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: backend
+                      port:
+                        number: 5000
+      EOF
+
+    # ── Apply all manifests ──
+    - kubectl apply -f backend-manifests.yaml
+    - echo "✅ Backend manifests applied"
+
+    # ── Wait for deployment to be ready ──
+    - kubectl rollout status deployment/backend -n default --timeout=5m
+
+    # ── Print backend ALB URL ──
+    - |
+      echo "⏳ Waiting for ALB to be assigned..."
+      sleep 30
+      BACKEND_URL=$(kubectl get ingress backend -n default \
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+      echo "✅ Backend live at: http://$BACKEND_URL"
+
   only:
     - main

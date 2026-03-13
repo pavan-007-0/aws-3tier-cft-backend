@@ -97,6 +97,11 @@ provision-eks:
               - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
       EOF
 
+    # ── Enable auto-assign public IP on both subnets (required for EKS node groups) ──
+    - aws ec2 modify-subnet-attribute --subnet-id subnet-0951f168b0769217c --map-public-ip-on-launch
+    - aws ec2 modify-subnet-attribute --subnet-id subnet-0a61c37122c11d0f1 --map-public-ip-on-launch
+    - echo "✅ Subnets configured for auto-assign public IP"
+
     # ── Create EKS cluster only if it doesn't exist ──
     - |
       if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" > /dev/null 2>&1; then

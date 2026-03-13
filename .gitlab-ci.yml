@@ -149,6 +149,19 @@ provision-eks:
         echo "✅ External Secrets Operator installed"
       fi
 
+    # ── Wait for CRDs to be available ──
+    - |
+      echo "⏳ Waiting for External Secrets CRDs to be available..."
+      for i in {1..30}; do
+        if kubectl get crd externalsecrets.external-secrets.io clustersecretstores.external-secrets.io > /dev/null 2>&1; then
+          echo "✅ CRDs are ready"
+          break
+        fi
+        echo "Attempt $i/30: CRDs not ready yet, waiting..."
+        sleep 2
+      done
+      sleep 3
+
     # ── Write and apply External Secrets manifests inline ──
     - |
       cat > external-secrets.yaml << EOF

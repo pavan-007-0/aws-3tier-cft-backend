@@ -66,19 +66,30 @@ provision-eks:
         region: ${AWS_DEFAULT_REGION}
         version: "1.29"
       vpc:
-        cidr: "10.0.0.0/16"
-        nat:
-          gateway: Single
-        publicAccessCIDRs:
-          - "0.0.0.0/0"
+        id: vpc-0c94c781bb54a1008
+        subnets:
+          public:
+            us-east-1a:
+              id: subnet-0951f168b0769217c
+            us-east-1b:
+              id: subnet-0a61c37122c11d0f1
       iam:
         withOIDC: true
+        serviceAccounts:
+          - metadata:
+              name: external-secrets-sa
+              namespace: external-secrets
+            attachPolicyARNs:
+              - arn:aws:iam::aws:policy/SecretsManagerReadWrite
       managedNodeGroups:
         - name: ecommerce-nodes
           instanceType: t3.small
           minSize: 1
           desiredCapacity: 2
           maxSize: 4
+          subnets:
+            - subnet-0951f168b0769217c
+            - subnet-0a61c37122c11d0f1
           iam:
             attachPolicyARNs:
               - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
@@ -126,6 +137,7 @@ provision-eks:
           -n external-secrets \
           --create-namespace \
           --set installCRDs=true \
+          --set serviceAccount.create=false \
           --set serviceAccount.name=external-secrets-sa
         echo "✅ External Secrets Operator installed"
       fi

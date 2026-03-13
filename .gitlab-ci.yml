@@ -106,6 +106,14 @@ provision-eks:
     - |
       if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" > /dev/null 2>&1; then
         echo "✅ Cluster already exists — skipping creation"
+        # Check if node group exists
+        if ! aws eks describe-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name ecommerce-nodes --region "$AWS_DEFAULT_REGION" > /dev/null 2>&1; then
+          echo "🚀 Node group missing, creating it..."
+          eksctl create nodegroup -f eksctl-cluster.yaml
+          echo "✅ Node group created"
+        else
+          echo "✅ Node group already exists"
+        fi
       else
         echo "🚀 Creating EKS cluster (this takes ~15 mins)..."
         eksctl create cluster -f eksctl-cluster.yaml

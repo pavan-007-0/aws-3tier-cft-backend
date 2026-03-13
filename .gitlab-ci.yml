@@ -66,13 +66,11 @@ provision-eks:
         region: ${AWS_DEFAULT_REGION}
         version: "1.29"
       vpc:
-        id: vpc-0c94c781bb54a1008
-        subnets:
-          public:
-            us-east-1a:
-              id: subnet-0951f168b0769217c
-            us-east-1b:
-              id: subnet-0a61c37122c11d0f1
+        cidr: "10.0.0.0/16"
+        nat:
+          gateway: Single
+        publicAccessCIDRs:
+          - "0.0.0.0/0"
       iam:
         withOIDC: true
         serviceAccounts:
@@ -87,9 +85,6 @@ provision-eks:
           minSize: 1
           desiredCapacity: 2
           maxSize: 4
-          subnets:
-            - subnet-0951f168b0769217c
-            - subnet-0a61c37122c11d0f1
           iam:
             attachPolicyARNs:
               - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy

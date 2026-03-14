@@ -132,15 +132,15 @@ provision-eks:
       echo "Waiting for External Secrets webhook to be ready..."
       kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
       echo "Waiting for External Secrets CRDs to be registered..."
-      for i in $(seq 1 20); do
-        if kubectl get crd clustersecretstores.external-secrets.io > /dev/null 2>&1 && kubectl get crd externalsecrets.external-secrets.io > /dev/null 2>&1; then
+      for i in $(seq 1 60); do
+        if kubectl api-resources | grep -q externalsecrets; then
           echo "CRDs are ready"
           break
         fi
-        echo "attempt $i - waiting 10s..."
-        sleep 10
+        echo "attempt $i/60 - waiting 2s..."
+        sleep 2
       done
-      sleep 10
+      sleep 5
 
     - |
       printf '%s\n' \

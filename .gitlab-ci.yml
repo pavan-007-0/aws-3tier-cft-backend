@@ -127,7 +127,11 @@ provision-eks:
       fi
 
     - |
-      echo "Waiting for External Secrets CRDs..."
+      echo "Waiting for External Secrets operator to be fully ready..."
+      kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
+      echo "Waiting for External Secrets webhook to be ready..."
+      kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
+      echo "Waiting for External Secrets CRDs to be registered..."
       for i in $(seq 1 20); do
         if kubectl get crd clustersecretstores.external-secrets.io > /dev/null 2>&1 && kubectl get crd externalsecrets.external-secrets.io > /dev/null 2>&1; then
           echo "CRDs are ready"
@@ -136,6 +140,7 @@ provision-eks:
         echo "attempt $i - waiting 10s..."
         sleep 10
       done
+      sleep 10
 
     - |
       printf '%s\n' \
@@ -226,8 +231,6 @@ deploy-backend:
         CORS_ORIGINS="http://$FRONTEND_URL"
       fi
       echo "CORS_ORIGINS=$CORS_ORIGINS"
-
-    - |
       printf '%s\n' \
         'apiVersion: apps/v1' \
         'kind: Deployment' \

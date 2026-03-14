@@ -113,36 +113,6 @@ provision-eks:
       fi
 
     - |
-      if helm status external-secrets -n external-secrets > /dev/null 2>&1; then
-        echo "External Secrets already installed - skipping"
-      else
-        helm repo add external-secrets https://charts.external-secrets.io && helm repo update
-        helm upgrade --install external-secrets external-secrets/external-secrets \
-          -n external-secrets \
-          --create-namespace \
-          --set installCRDs=true \
-          --set serviceAccount.create=false \
-          --set serviceAccount.name=external-secrets-sa
-        echo "External Secrets Operator installed"
-      fi
-
-    - |
-      echo "Waiting for External Secrets operator to be fully ready..."
-      kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
-      echo "Waiting for External Secrets webhook to be ready..."
-      kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
-      echo "Waiting for External Secrets CRDs to be registered..."
-      for i in $(seq 1 60); do
-        if kubectl api-resources | grep -q externalsecrets; then
-          echo "CRDs are ready"
-          break
-        fi
-        echo "attempt $i/60 - waiting 2s..."
-        sleep 2
-      done
-      sleep 5
-
-    - |
       printf '%s\n' \
         'apiVersion: external-secrets.io/v1beta1' \
         'kind: ClusterSecretStore' \

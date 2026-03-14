@@ -113,6 +113,21 @@ provision-eks:
       fi
 
     - |
+      if helm status external-secrets -n external-secrets > /dev/null 2>&1; then
+        echo "External Secrets Operator already installed - skipping"
+      else
+        helm repo add external-secrets https://charts.external-secrets.io && helm repo update
+        helm upgrade --install external-secrets external-secrets/external-secrets \
+          -n external-secrets \
+          --create-namespace \
+          --set installCRDs=true
+        kubectl wait --for=condition=established --timeout=60s \
+          crd/clustersecretstores.external-secrets.io \
+          crd/externalsecrets.external-secrets.io
+        echo "External Secrets Operator installed"
+      fi
+
+    - |
       printf '%s\n' \
         'apiVersion: external-secrets.io/v1beta1' \
         'kind: ClusterSecretStore' \

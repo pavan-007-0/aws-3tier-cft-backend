@@ -145,9 +145,11 @@ provision-eks:
         echo "attempt $i - waiting 10s..."
         sleep 10
       done
-      echo "Applying External Secrets manifests with retry..."
+      echo "Busting kubectl discovery cache and applying External Secrets..."
+      rm -rf /root/.kube/cache/discovery/
+      rm -rf /root/.kube/http-cache/
       printf '%s\n' \
-        'apiVersion: external-secrets.io/v1beta1' \
+        'apiVersion: external-secrets.io/v1' \
         'kind: ClusterSecretStore' \
         'metadata:' \
         '  name: aws-secrets-manager' \
@@ -162,10 +164,10 @@ provision-eks:
         '            name: external-secrets-sa' \
         '            namespace: external-secrets' \
         '---' \
-        'apiVersion: external-secrets.io/v1beta1' \
+        'apiVersion: external-secrets.io/v1' \
         'kind: ExternalSecret' \
         'metadata:' \
-        '  name: rds-secret' \
+        '  name: backend-secrets' \
         '  namespace: default' \
         'spec:' \
         '  refreshInterval: 1h' \
@@ -178,27 +180,12 @@ provision-eks:
         '  data:' \
         '    - secretKey: DB_USER' \
         '      remoteRef:' \
-        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL"' \
+        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"' \
         '        property: username' \
         '    - secretKey: DB_PASSWORD' \
         '      remoteRef:' \
-        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1-cFksCL"' \
+        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"' \
         '        property: password' \
-        '---' \
-        'apiVersion: external-secrets.io/v1beta1' \
-        'kind: ExternalSecret' \
-        'metadata:' \
-        '  name: app-secret' \
-        '  namespace: default' \
-        'spec:' \
-        '  refreshInterval: 1h' \
-        '  secretStoreRef:' \
-        '    name: aws-secrets-manager' \
-        '    kind: ClusterSecretStore' \
-        '  target:' \
-        '    name: backend-secrets' \
-        '    creationPolicy: Merge' \
-        '  data:' \
         '    - secretKey: JWT_SECRET_KEY' \
         '      remoteRef:' \
         '        key: "app/backend/secrets"' \
@@ -208,7 +195,7 @@ provision-eks:
         '        key: "app/backend/secrets"' \
         '        property: SECRET_KEY' \
         > external-secrets.yaml
-      kubectl apply -f external-secrets.yaml --server-side --force-conflicts
+      kubectl apply -f external-secrets.yaml
       echo "External Secrets applied successfully"
 
   only:

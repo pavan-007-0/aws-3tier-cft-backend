@@ -208,16 +208,8 @@ provision-eks:
         '        key: "app/backend/secrets"' \
         '        property: SECRET_KEY' \
         > external-secrets.yaml
-      for attempt in $(seq 1 10); do
-        echo "kubectl apply attempt $attempt..."
-        if kubectl apply -f external-secrets.yaml --validate=false; then
-          echo "External Secrets applied successfully"
-          break
-        fi
-        echo "Apply failed - waiting 15s before retry..."
-        sleep 15
-        kubectl api-resources > /dev/null 2>&1 || true
-      done
+      kubectl apply -f external-secrets.yaml --server-side --force-conflicts
+      echo "External Secrets applied successfully"
 
   only:
     - main

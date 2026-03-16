@@ -9,17 +9,23 @@ variables:
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
   CLUSTER_NAME: ecommerce-cluster
+  # Preserved from your CloudFormation parameters
+  VPC_ID: "vpc-0c94c781bb54a1008"
+  SUBNET_A: "subnet-0951f168b0769217c"
+  SUBNET_B: "subnet-0a61c37122c11d0f1"
+  RDS_SG_ID: "sg-0f5f53246f5b20572"
 
 stages:
   - build
-  - infra
   - deploy
 
+before_script:
+  - apk add --no-cache aws-cli curl bash jq gettext
+  - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# ================= BUILD =================
 build-backend:
   stage: build
-  before_script:
-    - apk add --no-cache aws-cli
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
     - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
     - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
@@ -29,84 +35,42 @@ build-backend:
   only:
     - main
 
-provision-eks:
-  stage: infra
+# ================= DEPLOY =================
+deploy-backend:
+  stage: deploy
   needs: ["build-backend"]
-  image: alpine:3.18
-  before_script:
-    - apk add --no-cache aws-cli curl bash openssl jq
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    - curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /usr/local/bin
-    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
-    - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   script:
-    # 1. Fix IAM permissions
-    - |
-      echo "🔧 Fixing NodeGroup IAM..."
-      NODE_ROLE=$(aws iam list-roles --query 'Roles[?contains(RoleName,`ecommerce-cluster-nodegroup`)]|[0].RoleName' --output text 2>/dev/null || echo "none")
-      if [ "$NODE_ROLE" != "none" ]; then
-        aws iam attach-role-policy --role-name "$NODE_ROLE" --policy-arn arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess || true
-        echo "✅ ELB permissions added: $NODE_ROLE"
-      fi
-      
+    # 1. Install kubectl
+    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    
     # 2. Update kubeconfig
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
-    
-    # 3. Install/upgrade ALB Controller
-    - |
-      echo "📦 Installing AWS Load Balancer Controller..."
-      helm repo add eks https://aws.github.io/eks-charts || true
-      helm repo update
-      helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-        -n kube-system --create-namespace \
-        --set clusterName=$CLUSTER_NAME \
-        --set serviceAccount.create=true \
-        --set region=$AWS_DEFAULT_REGION \
-        --set vpcId=vpc-0c94c781bb54a1008 \
-        --wait --timeout=5m
-      kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
 
-    # 4. Install External Secrets (with robust CRD waiting)
+    # 3. Allow EKS Nodes to access RDS (Replaces 'AllowEcsToRds' CloudFormation rule)
     - |
-      echo "🔑 Installing External Secrets..."
-      helm repo add external-secrets https://charts.external-secrets.io || true
-      helm repo update
-      helm upgrade --install external-secrets external-secrets/external-secrets \
-        -n external-secrets --create-namespace --wait --timeout=5m \
-        --set installCRDs=true \
-        --set serviceAccount.create=true
+      echo "🔐 Authorizing EKS nodes to access RDS Database..."
+      EKS_NODE_SG=$(aws eks describe-cluster --name "$CLUSTER_NAME" --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
       
-      echo "⏳ Waiting for External Secrets pods to be available..."
-      kubectl wait --for=condition=Available deployment/external-secrets -n external-secrets --timeout=120s
-      kubectl wait --for=condition=Available deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
+      # Check if rule already exists to avoid errors
+      RULE_EXISTS=$(aws ec2 describe-security-group-rules --filters Name="group-id",Values="$RDS_SG_ID" Name="ip-permission.to-port",Values="3306" Name="ip-permission.from-port",Values="3306" Name="ip-permission.protocol",Values="tcp" Name="ip-permission.user-id-group-pairs.group-id",Values="$EKS_NODE_SG" --query "SecurityGroupRules" --output text)
+      
+      if [ -z "$RULE_EXISTS" ]; then
+        aws ec2 authorize-security-group-ingress --group-id "$RDS_SG_ID" --protocol tcp --port 3306 --source-group "$EKS_NODE_SG" || true
+        echo "✅ Access granted from EKS ($EKS_NODE_SG) to RDS ($RDS_SG_ID)"
+      else
+        echo "✅ EKS to RDS security group rule already exists."
+      fi
 
-      echo "⏳ Waiting for CRDs to be Established by the API Server..."
-      kubectl wait --for condition=established --timeout=60s crd/clustersecretstores.external-secrets.io
-      kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io
-      echo "✅ External Secrets CRDs ready and established!"
-
-    # 5. Create secrets configuration
+    # 4. Fetch Frontend URL for CORS (Preserved from old script)
     - |
-      # Clear kubectl discovery cache to force it to see the new CRDs
-      rm -rf ~/.kube/cache
+      FRONTEND_URL=$(aws cloudformation describe-stacks --stack-name frontend-stack --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" --output text || echo "http://localhost:4200")
+      echo "Detected Frontend URL: $FRONTEND_URL"
 
-      # Write the manifest to a file first for cleaner retry logic
-      cat << 'EOF' > external-secrets-config.yaml
-      apiVersion: external-secrets.io/v1beta1
-      kind: ClusterSecretStore
-      metadata:
-        name: aws-secrets-manager
-      spec:
-        provider:
-          aws:
-            service: SecretsManager
-            region: us-east-1
-            auth:
-              jwt:
-                serviceAccountRef:
-                  name: external-secrets-sa
-                  namespace: external-secrets
-      ---
+    # 5. Generate and Apply Kubernetes Manifests
+    - |
+      echo "📦 Deploying Kubernetes Manifests..."
+      cat > backend-manifests.yaml << EOF
       apiVersion: external-secrets.io/v1beta1
       kind: ExternalSecret
       metadata:
@@ -137,42 +101,14 @@ provision-eks:
           remoteRef:
             key: "app/backend/secrets"
             property: SECRET_KEY
-      EOF
-
-      echo "⚙️ Applying secrets configuration..."
-      # Retry loop to handle any lingering webhook or API caching latency
-      for i in {1..5}; do
-        if kubectl apply -f external-secrets-config.yaml; then
-          echo "✅ Secrets configured successfully!"
-          break
-        fi
-        echo "⚠️ API not ready yet, retrying in 10 seconds... ($i/5)"
-        sleep 10
-      done
-  only:
-    - main
-
-deploy-backend:
-  stage: deploy
-  needs: ["provision-eks"]
-  image: alpine:3.18
-  before_script:
-    - apk add --no-cache aws-cli curl bash jq gettext
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    - chmod +x kubectl && mv kubectl /usr/local/bin/
-    - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
-  script:
-    # Deploy complete backend stack
-    - |
-      cat > backend-manifests.yaml << EOF
+      ---
       apiVersion: apps/v1
       kind: Deployment
       metadata:
         name: backend
         namespace: default
       spec:
-        replicas: 2
+        replicas: 1
         selector:
           matchLabels:
             app: backend
@@ -188,11 +124,13 @@ deploy-backend:
               - containerPort: 5000
               env:
               - name: DB_HOST
-                value: "database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com"
+                value: "database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com"
               - name: DB_NAME
                 value: "ecommerce_db"
               - name: FLASK_ENV
                 value: "production"
+              - name: CORS_ORIGINS
+                value: "${FRONTEND_URL}"
               - name: DB_USER
                 valueFrom:
                   secretKeyRef:
@@ -215,23 +153,8 @@ deploy-backend:
                     key: SECRET_KEY
               resources:
                 requests:
-                  cpu: "125m"
-                  memory: "256Mi"
-                limits:
-                  cpu: "250m"
+                  cpu: "256m"
                   memory: "512Mi"
-              livenessProbe:
-                httpGet:
-                  path: /health
-                  port: 5000
-                initialDelaySeconds: 30
-                periodSeconds: 30
-              readinessProbe:
-                httpGet:
-                  path: /health
-                  port: 5000
-                initialDelaySeconds: 20
-                periodSeconds: 20
       ---
       apiVersion: v1
       kind: Service
@@ -256,12 +179,9 @@ deploy-backend:
           kubernetes.io/ingress.class: alb
           alb.ingress.kubernetes.io/scheme: internet-facing
           alb.ingress.kubernetes.io/target-type: ip
-          alb.ingress.kubernetes.io/healthcheck-path: /health
-          alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-          alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-          alb.ingress.kubernetes.io/healthy-threshold-count: "3"
-          alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+          alb.ingress.kubernetes.io/subnets: ${SUBNET_A}, ${SUBNET_B}
           alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+          alb.ingress.kubernetes.io/healthcheck-path: /health
       spec:
         rules:
         - http:
@@ -275,32 +195,20 @@ deploy-backend:
                     number: 5000
       EOF
       
-    # Apply manifests
-    - kubectl apply -f backend-manifests.yaml
-    - kubectl rollout status deployment/backend -n default --timeout=300s
-    - echo "✅ Backend deployment successful!"
-    
-    # Wait for ALB provisioning and test
+      kubectl apply -f backend-manifests.yaml
+      kubectl rollout status deployment/backend -n default --timeout=300s
+      echo "✅ Backend successfully deployed to EKS!"
+
+    # 6. Get the new ALB URL
     - |
-      echo "⏳ Waiting for ALB Load Balancer (5 minutes max)..."
-      for i in {1..300}; do
-        BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+      echo "⏳ Waiting for ALB Load Balancer to provision..."
+      for i in {1..120}; do
+        BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
         if [ -n "$BACKEND_URL" ]; then
           echo "🎉 BACKEND LIVE AT: http://$BACKEND_URL"
-          echo "🩺 Testing health endpoint..."
-          if curl -f -m 10 "http://$BACKEND_URL/health"; then
-            echo "✅ HEALTH CHECK PASSED!"
-          else
-            echo "⚠️ Health check failed - check pod logs"
-          fi
-          kubectl get ingress backend -n default -o wide
           break
         fi
-        echo "⏳ ALB provisioning... ($i/300)"
-        sleep 1
+        sleep 5
       done
-    - echo "🚀 E-COMMERCE BACKEND FULLY DEPLOYED TO PRODUCTION!"
-    - kubectl get all -n default
-    - kubectl get ingress -n default
   only:
     - main

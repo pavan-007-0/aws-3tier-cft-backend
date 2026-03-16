@@ -140,8 +140,6 @@ provision-eks:
       echo "Refreshing kubectl API discovery..."
       kubectl api-resources --verbs=list > /dev/null 2>&1 || true
       sleep 5
-
-    - |
       printf '%s\n' \
         'apiVersion: external-secrets.io/v1beta1' \
         'kind: ClusterSecretStore' \
@@ -197,11 +195,11 @@ provision-eks:
         '  data:' \
         '    - secretKey: JWT_SECRET_KEY' \
         '      remoteRef:' \
-        '        key: "app/backend/secrets-0DFyuf"' \
+        '        key: "app/backend/secrets"' \
         '        property: JWT_SECRET_KEY' \
         '    - secretKey: SECRET_KEY' \
         '      remoteRef:' \
-        '        key: "app/backend/secrets-0DFyuf"' \
+        '        key: "app/backend/secrets"' \
         '        property: SECRET_KEY' \
         > external-secrets.yaml
       kubectl apply -f external-secrets.yaml

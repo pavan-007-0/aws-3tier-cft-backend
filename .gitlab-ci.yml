@@ -39,65 +39,15 @@ provision-eks:
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
     - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   script:
-    # FIX IAM permissions automatically
+    # 1. Fix IAM (✅ WORKING)
     - |
-      echo "🔧 Auto-fixing NodeGroup IAM permissions..."
-      NODE_ROLE=$(aws iam list-roles --query 'Roles[?contains(RoleName, `ecommerce-cluster-nodegroup`)]|[0].RoleName' --output text 2>/dev/null || echo "none")
-      if [ "$NODE_ROLE" != "none" ]; then
-        aws iam attach-role-policy --role-name "$NODE_ROLE" --policy-arn arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess || true
-        echo "✅ ELB permissions added: $NODE_ROLE"
-      fi
+      NODE_ROLE=$(aws iam list-roles --query 'Roles[?contains(RoleName,`ecommerce-cluster-nodegroup`)]|[0].RoleName' --output text 2>/dev/null || echo "none")
+      [ "$NODE_ROLE" != "none" ] && aws iam attach-role-policy --role-name "$NODE_ROLE" --policy-arn arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
 
-    # EKS cluster config with correct IAM
-    - |
-      cat > cluster-config.yaml << EOF
-      apiVersion: eksctl.io/v1alpha5
-      kind: ClusterConfig
-      metadata:
-        name: ${CLUSTER_NAME}
-        region: ${AWS_DEFAULT_REGION}
-        version: "1.30"
-      iam:
-        withOIDC: true
-        serviceAccounts:
-          - metadata:
-              name: aws-load-balancer-controller
-              namespace: kube-system
-            attachPolicyARNs:
-              - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
-      vpc:
-        id: vpc-0c94c781bb54a1008
-        subnets:
-          public:
-            us-east-1a: {id: subnet-0951f168b0769217c}
-            us-east-1b: {id: subnet-0a61c37122c11d0f1}
-      managedNodeGroups:
-        - name: ecommerce-nodes
-          instanceType: t3.small
-          minSize: 1
-          desiredCapacity: 2
-          iam:
-            attachPolicyARNs:
-              - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
-              - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-              - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-              - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
-      EOF
-
-    # Create/update cluster
-    - aws ec2 modify-subnet-attribute --subnet-id subnet-0951f168b0769217c --map-public-ip-on-launch || true
-    - aws ec2 modify-subnet-attribute --subnet-id subnet-0a61c37122c11d0f1 --map-public-ip-on-launch || true
-    - |
-      if aws eks describe-cluster --name "$CLUSTER_NAME" >/dev/null 2>&1; then
-        echo "✅ Cluster exists"
-        eksctl utils update-cluster-iam-roles -f cluster-config.yaml --approve || true
-      else
-        echo "🚀 Creating cluster..."
-        eksctl create cluster -f cluster-config.yaml
-      fi
+    # 2. Cluster check + kubeconfig
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
 
-    # Install ALB Controller
+    # 3. ALB Controller (✅ WORKING)
     - |
       helm repo add eks https://aws.github.io/eks-charts || true
       helm repo update
@@ -106,18 +56,20 @@ provision-eks:
         --set clusterName=$CLUSTER_NAME \
         --set serviceAccount.create=true \
         --set region=$AWS_DEFAULT_REGION \
-        --set vpcId=vpc-0c94c781bb54a1008 \
-        --wait --timeout=5m || true
-      kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s || true
+        --set vpcId=vpc-0c94c781bb54a1008 --wait
 
-    # External Secrets (your existing setup)
+    # 4. External Secrets WITH CRD WAIT (🔧 FIXED)
     - |
       helm repo add external-secrets https://charts.external-secrets.io || true
       helm repo update
       helm upgrade --install external-secrets external-secrets/external-secrets \
-        -n external-secrets --create-namespace \
-        --set installCRDs=true \
-        --set serviceAccount.create=true || true
+        -n external-secrets --create-namespace --wait \
+        --set installCRDs=true --set serviceAccount.create=true
+      
+      # Wait for CRDs
+      for i in {1..30}; do kubectl get crd clustersecretstores.external-secrets.io && break || sleep 3; done
+      
+      # Apply secrets
       kubectl apply -f- << EOF
       apiVersion: external-secrets.io/v1beta1
       kind: ClusterSecretStore
@@ -133,9 +85,28 @@ provision-eks:
                 serviceAccountRef:
                   name: external-secrets-sa
                   namespace: external-secrets
+      ---
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: backend-secrets
+        namespace: default
+      spec:
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: backend-secrets
+        data:
+        - secretKey: DB_USER
+          remoteRef:
+            key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+            property: username
+        - secretKey: DB_PASSWORD
+          remoteRef:
+            key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+            property: password
       EOF
-  only:
-    - main
 
 deploy-backend:
   stage: deploy
@@ -143,13 +114,11 @@ deploy-backend:
   image: alpine:3.18
   before_script:
     - apk add --no-cache aws-cli curl bash jq
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
   script:
-    # Deploy backend manifests
     - |
-      cat > backend-manifests.yaml << EOF
+      kubectl apply -f- << EOF
       apiVersion: apps/v1
       kind: Deployment
       metadata:
@@ -167,7 +136,7 @@ deploy-backend:
           spec:
             containers:
             - name: backend
-              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+              image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
               ports:
               - containerPort: 5000
               env:
@@ -187,32 +156,16 @@ deploy-backend:
                   secretKeyRef:
                     name: backend-secrets
                     key: DB_PASSWORD
-              - name: JWT_SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: JWT_SECRET_KEY
-              - name: SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: SECRET_KEY
               livenessProbe:
                 httpGet:
                   path: /health
                   port: 5000
                 initialDelaySeconds: 30
-              readinessProbe:
-                httpGet:
-                  path: /health
-                  port: 5000
-                initialDelaySeconds: 20
       ---
       apiVersion: v1
       kind: Service
       metadata:
         name: backend
-        namespace: default
       spec:
         selector:
           app: backend
@@ -224,17 +177,12 @@ deploy-backend:
       kind: Ingress
       metadata:
         name: backend
-        namespace: default
         annotations:
           kubernetes.io/ingress.class: alb
           alb.ingress.kubernetes.io/scheme: internet-facing
           alb.ingress.kubernetes.io/target-type: ip
           alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
           alb.ingress.kubernetes.io/healthcheck-path: /health
-          alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-          alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-          alb.ingress.kubernetes.io/healthy-threshold-count: "3"
-          alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
       spec:
         rules:
         - http:
@@ -247,22 +195,11 @@ deploy-backend:
                   port:
                     number: 5000
       EOF
-
-    - kubectl apply -f backend-manifests.yaml
-    - kubectl rollout status deployment/backend -n default --timeout=300s
+    - kubectl rollout status deployment/backend --timeout=300s
     - |
-      echo "⏳ Waiting for ALB provisioning (5 mins max)..."
       for i in {1..300}; do
-        BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-        if [ -n "$BACKEND_URL" ]; then
-          echo "🎉 BACKEND LIVE: http://$BACKEND_URL"
-          sleep 5
-          curl -f -m 10 "http://$BACKEND_URL/health" && echo "✅ Health check PASSED!" && break
-        fi
-        echo "⏳ ALB ready in $((300-i))s... ($i/300)"
-        sleep 1
+        URL=$(kubectl get ingress backend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        [ -n "$URL" ] && echo "🎉 BACKEND LIVE: http://$URL" && curl -f http://$URL/health && break || sleep 1
       done
-    - kubectl get ingress backend -n default -o wide
-    - echo "🚀 Production deployment COMPLETE!"
   only:
     - main

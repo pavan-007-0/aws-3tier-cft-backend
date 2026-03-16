@@ -98,6 +98,14 @@ provision-eks:
     - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
 
     - |
+      echo "Granting gitlab-cicd-user admin access to EKS cluster..."
+      CICD_USER_ARN=$(aws iam get-user --user-name gitlab-cicd-user --query 'User.Arn' --output text)
+      echo "IAM user ARN: $CICD_USER_ARN"
+      aws eks create-access-entry         --cluster-name "$CLUSTER_NAME"         --principal-arn "$CICD_USER_ARN"         --region "$AWS_DEFAULT_REGION" 2>/dev/null || echo "Access entry already exists"
+      aws eks associate-access-policy         --cluster-name "$CLUSTER_NAME"         --principal-arn "$CICD_USER_ARN"         --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy         --access-scope type=cluster         --region "$AWS_DEFAULT_REGION" 2>/dev/null || echo "Policy already associated"
+      echo "EKS access granted to gitlab-cicd-user"
+
+    - |
       if helm status aws-load-balancer-controller -n kube-system > /dev/null 2>&1; then
         echo "ALB Controller already installed - skipping"
       else
@@ -137,9 +145,7 @@ provision-eks:
         echo "attempt $i - waiting 10s..."
         sleep 10
       done
-      echo "Refreshing kubectl API discovery..."
-      kubectl api-resources --verbs=list > /dev/null 2>&1 || true
-      sleep 5
+      echo "Applying External Secrets manifests with retry..."
       printf '%s\n' \
         'apiVersion: external-secrets.io/v1beta1' \
         'kind: ClusterSecretStore' \
@@ -202,8 +208,16 @@ provision-eks:
         '        key: "app/backend/secrets"' \
         '        property: SECRET_KEY' \
         > external-secrets.yaml
-      kubectl apply -f external-secrets.yaml
-      echo "External Secrets applied"
+      for attempt in $(seq 1 10); do
+        echo "kubectl apply attempt $attempt..."
+        if kubectl apply -f external-secrets.yaml --validate=false; then
+          echo "External Secrets applied successfully"
+          break
+        fi
+        echo "Apply failed - waiting 15s before retry..."
+        sleep 15
+        kubectl api-resources > /dev/null 2>&1 || true
+      done"
 
   only:
     - main

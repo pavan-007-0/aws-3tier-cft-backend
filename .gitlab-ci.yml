@@ -15,7 +15,6 @@ stages:
   - infra
   - deploy
 
-# BUILD stage uses docker:24 image (default)
 build-backend:
   stage: build
   before_script:
@@ -30,7 +29,6 @@ build-backend:
   only:
     - main
 
-# INFRA stage - provision EKS cluster and install controllers
 provision-eks:
   stage: infra
   needs: ["build-backend"]
@@ -44,7 +42,7 @@ provision-eks:
     - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   script:
     - |
-      cat > eksctl-cluster.yaml << EOF
+      cat > cluster-config.yaml << EOF
       apiVersion: eksctl.io/v1alpha5
       kind: ClusterConfig
       metadata:
@@ -83,261 +81,273 @@ provision-eks:
               - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
       EOF
 
-    - aws ec2 modify-subnet-attribute --subnet-id subnet-0951f168b0769217c --map-public-ip-on-launch
-    - aws ec2 modify-subnet-attribute --subnet-id subnet-0a61c37122c11d0f1 --map-public-ip-on-launch
+    - aws ec2 modify-subnet-attribute --subnet-id subnet-0951f168b0769217c --map-public-ip-on-launch || true
+    - aws ec2 modify-subnet-attribute --subnet-id subnet-0a61c37122c11d0f1 --map-public-ip-on-launch || true
 
     - |
       if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" > /dev/null 2>&1; then
-        echo "Cluster already exists - skipping creation"
+        echo "✅ Cluster exists - skipping creation"
       else
-        echo "Creating EKS cluster..."
-        eksctl create cluster -f eksctl-cluster.yaml
-        echo "Cluster created"
+        echo "🚀 Creating EKS cluster..."
+        eksctl create cluster -f cluster-config.yaml
       fi
 
     - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
 
     - |
-      echo "Granting gitlab-cicd-user admin access to EKS cluster..."
+      echo "🔐 Granting gitlab-cicd-user admin access..."
       CICD_USER_ARN=$(aws iam get-user --user-name gitlab-cicd-user --query 'User.Arn' --output text)
-      echo "IAM user ARN: $CICD_USER_ARN"
-      aws eks create-access-entry         --cluster-name "$CLUSTER_NAME"         --principal-arn "$CICD_USER_ARN"         --region "$AWS_DEFAULT_REGION" 2>/dev/null || echo "Access entry already exists"
-      aws eks associate-access-policy         --cluster-name "$CLUSTER_NAME"         --principal-arn "$CICD_USER_ARN"         --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy         --access-scope type=cluster         --region "$AWS_DEFAULT_REGION" 2>/dev/null || echo "Policy already associated"
-      echo "EKS access granted to gitlab-cicd-user"
+      aws eks create-access-entry --cluster-name "$CLUSTER_NAME" --principal-arn "$CICD_USER_ARN" --region "$AWS_DEFAULT_REGION" 2>/dev/null || true
+      aws eks associate-access-policy --cluster-name "$CLUSTER_NAME" --principal-arn "$CICD_USER_ARN" --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy --access-scope type=cluster --region "$AWS_DEFAULT_REGION" 2>/dev/null || true
 
     - |
-      if helm status aws-load-balancer-controller -n kube-system > /dev/null 2>&1; then
-        echo "ALB Controller already installed - skipping"
-      else
-        helm repo add eks https://aws.github.io/eks-charts && helm repo update
+      if ! helm status aws-load-balancer-controller -n kube-system >/dev/null 2>&1; then
+        echo "📦 Installing ALB Controller..."
+        helm repo add eks https://aws.github.io/eks-charts
+        helm repo update
         helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-          -n kube-system \
+          -n kube-system --create-namespace \
           --set clusterName=$CLUSTER_NAME \
           --set serviceAccount.create=true \
           --set region=$AWS_DEFAULT_REGION \
-          --set vpcId=vpc-0c94c781bb54a1008
+          --set vpcId=vpc-0c94c781bb54a1008 \
+          --set enableCertificateSupport=true
         kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
-        echo "ALB Controller installed"
+      else
+        echo "✅ ALB Controller exists"
       fi
 
     - |
-      if helm status external-secrets -n external-secrets > /dev/null 2>&1; then
-        echo "External Secrets already installed - skipping"
-      else
-        helm repo add external-secrets https://charts.external-secrets.io && helm repo update
+      if ! helm status external-secrets -n external-secrets >/dev/null 2>&1; then
+        echo "🔑 Installing External Secrets..."
+        helm repo add external-secrets https://charts.external-secrets.io
+        helm repo update
         helm upgrade --install external-secrets external-secrets/external-secrets \
-          -n external-secrets \
-          --create-namespace \
+          -n external-secrets --create-namespace \
           --set installCRDs=true \
           --set serviceAccount.create=false \
           --set serviceAccount.name=external-secrets-sa
-        echo "External Secrets Operator installed"
+        kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
+      else
+        echo "✅ External Secrets exists"
       fi
-      echo "Waiting for External Secrets operator pods..."
-      kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
-      kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
-      echo "Waiting for CRDs to be registered..."
-      for i in $(seq 1 20); do
-        if kubectl get crd clustersecretstores.external-secrets.io > /dev/null 2>&1 && kubectl get crd externalsecrets.external-secrets.io > /dev/null 2>&1; then
-          echo "CRDs ready"
-          break
-        fi
-        echo "attempt $i - waiting 10s..."
-        sleep 10
-      done
-      echo "Busting kubectl discovery cache and applying External Secrets..."
-      rm -rf /root/.kube/cache/discovery/
-      rm -rf /root/.kube/http-cache/
-      printf '%s\n' \
-        'apiVersion: external-secrets.io/v1' \
-        'kind: ClusterSecretStore' \
-        'metadata:' \
-        '  name: aws-secrets-manager' \
-        'spec:' \
-        '  provider:' \
-        '    aws:' \
-        '      service: SecretsManager' \
-        '      region: us-east-1' \
-        '      auth:' \
-        '        jwt:' \
-        '          serviceAccountRef:' \
-        '            name: external-secrets-sa' \
-        '            namespace: external-secrets' \
-        '---' \
-        'apiVersion: external-secrets.io/v1' \
-        'kind: ExternalSecret' \
-        'metadata:' \
-        '  name: backend-secrets' \
-        '  namespace: default' \
-        'spec:' \
-        '  refreshInterval: 1h' \
-        '  secretStoreRef:' \
-        '    name: aws-secrets-manager' \
-        '    kind: ClusterSecretStore' \
-        '  target:' \
-        '    name: backend-secrets' \
-        '    creationPolicy: Owner' \
-        '  data:' \
-        '    - secretKey: DB_USER' \
-        '      remoteRef:' \
-        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"' \
-        '        property: username' \
-        '    - secretKey: DB_PASSWORD' \
-        '      remoteRef:' \
-        '        key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"' \
-        '        property: password' \
-        '    - secretKey: JWT_SECRET_KEY' \
-        '      remoteRef:' \
-        '        key: "app/backend/secrets"' \
-        '        property: JWT_SECRET_KEY' \
-        '    - secretKey: SECRET_KEY' \
-        '      remoteRef:' \
-        '        key: "app/backend/secrets"' \
-        '        property: SECRET_KEY' \
-        > external-secrets.yaml
-      kubectl apply -f external-secrets.yaml
-      echo "External Secrets applied successfully"
 
-  only:
-    - main
+    - |
+      echo "🔄 Applying External Secrets config..."
+      kubectl apply -f- << EOF
+      apiVersion: external-secrets.io/v1
+      kind: ClusterSecretStore
+      metadata:
+        name: aws-secrets-manager
+      spec:
+        provider:
+          aws:
+            service: SecretsManager
+            region: us-east-1
+            auth:
+              jwt:
+                serviceAccountRef:
+                  name: external-secrets-sa
+                  namespace: external-secrets
+      ---
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
+        name: backend-secrets
+        namespace: default
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: backend-secrets
+          creationPolicy: Owner
+        data:
+          - secretKey: DB_USER
+            remoteRef:
+              key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+              property: username
+          - secretKey: DB_PASSWORD
+            remoteRef:
+              key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+              property: password
+          - secretKey: JWT_SECRET_KEY
+            remoteRef:
+              key: "app/backend/secrets"
+              property: JWT_SECRET_KEY
+          - secretKey: SECRET_KEY
+            remoteRef:
+              key: "app/backend/secrets"
+              property: SECRET_KEY
+      EOF
 
-# DEPLOY stage - deploy Flask app to EKS
+  only: main
+
 deploy-backend:
   stage: deploy
   needs: ["provision-eks"]
   image: alpine:3.18
   before_script:
-    - apk add --no-cache aws-cli curl bash
+    - apk add --no-cache aws-cli curl bash gettext
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
   script:
     - |
+      # Determine CORS origins
       FRONTEND_URL=$(kubectl get ingress frontend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-      if [ -z "$FRONTEND_URL" ]; then
-        CORS_ORIGINS="http://localhost:4200"
-      else
+      if [ -n "$FRONTEND_URL" ]; then
         CORS_ORIGINS="http://$FRONTEND_URL"
+      else
+        CORS_ORIGINS="http://localhost:4200"
       fi
-      echo "CORS_ORIGINS=$CORS_ORIGINS"
-      printf '%s\n' \
-        'apiVersion: apps/v1' \
-        'kind: Deployment' \
-        'metadata:' \
-        '  name: backend' \
-        '  namespace: default' \
-        'spec:' \
-        '  replicas: 1' \
-        '  selector:' \
-        '    matchLabels:' \
-        '      app: backend' \
-        '  template:' \
-        '    metadata:' \
-        '      labels:' \
-        '        app: backend' \
-        '    spec:' \
-        '      containers:' \
-        '        - name: backend' \
-        "          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}" \
-        '          imagePullPolicy: Always' \
-        '          ports:' \
-        '            - containerPort: 5000' \
-        '          env:' \
-        '            - name: DB_HOST' \
-        '              value: "database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com"' \
-        '            - name: DB_NAME' \
-        '              value: "ecommerce_db"' \
-        '            - name: FLASK_ENV' \
-        '              value: "production"' \
-        '            - name: CORS_ORIGINS' \
-        "              value: \"${CORS_ORIGINS}\"" \
-        '            - name: DB_USER' \
-        '              valueFrom:' \
-        '                secretKeyRef:' \
-        '                  name: backend-secrets' \
-        '                  key: DB_USER' \
-        '            - name: DB_PASSWORD' \
-        '              valueFrom:' \
-        '                secretKeyRef:' \
-        '                  name: backend-secrets' \
-        '                  key: DB_PASSWORD' \
-        '            - name: JWT_SECRET_KEY' \
-        '              valueFrom:' \
-        '                secretKeyRef:' \
-        '                  name: backend-secrets' \
-        '                  key: JWT_SECRET_KEY' \
-        '            - name: SECRET_KEY' \
-        '              valueFrom:' \
-        '                secretKeyRef:' \
-        '                  name: backend-secrets' \
-        '                  key: SECRET_KEY' \
-        '          resources:' \
-        '            requests:' \
-        '              cpu: "125m"' \
-        '              memory: "256Mi"' \
-        '            limits:' \
-        '              cpu: "250m"' \
-        '              memory: "512Mi"' \
-        '          livenessProbe:' \
-        '            httpGet:' \
-        '              path: /health' \
-        '              port: 5000' \
-        '            initialDelaySeconds: 15' \
-        '            periodSeconds: 20' \
-        '          readinessProbe:' \
-        '            httpGet:' \
-        '              path: /health' \
-        '              port: 5000' \
-        '            initialDelaySeconds: 5' \
-        '            periodSeconds: 10' \
-        '---' \
-        'apiVersion: v1' \
-        'kind: Service' \
-        'metadata:' \
-        '  name: backend' \
-        '  namespace: default' \
-        'spec:' \
-        '  type: ClusterIP' \
-        '  selector:' \
-        '    app: backend' \
-        '  ports:' \
-        '    - port: 5000' \
-        '      targetPort: 5000' \
-        '      protocol: TCP' \
-        '---' \
-        'apiVersion: networking.k8s.io/v1' \
-        'kind: Ingress' \
-        'metadata:' \
-        '  name: backend' \
-        '  namespace: default' \
-        '  annotations:' \
-        '    kubernetes.io/ingress.class: alb' \
-        '    alb.ingress.kubernetes.io/scheme: internet-facing' \
-        '    alb.ingress.kubernetes.io/target-type: ip' \
-        '    alb.ingress.kubernetes.io/healthcheck-path: /health' \
-        '    alb.ingress.kubernetes.io/listen-ports: '"'"'[{"HTTP": 80}]'"'"'' \
-        'spec:' \
-        '  rules:' \
-        '    - http:' \
-        '        paths:' \
-        '          - path: /' \
-        '            pathType: Prefix' \
-        '            backend:' \
-        '              service:' \
-        '                name: backend' \
-        '                port:' \
-        '                  number: 5000' \
-        > backend-manifests.yaml
-      kubectl apply -f backend-manifests.yaml
-      echo "Backend manifests applied"
-
-    - kubectl rollout status deployment/backend -n default --timeout=5m
+      echo "🌐 CORS_ORIGINS=$CORS_ORIGINS"
 
     - |
-      sleep 30
-      BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-      echo "Backend live at: http://$BACKEND_URL"
+      # Create optimized manifests with proper variable substitution
+      cat > backend-manifests.yaml << EOF
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        replicas: 2
+        selector:
+          matchLabels:
+            app: backend
+        template:
+          metadata:
+            labels:
+              app: backend
+          spec:
+            containers:
+            - name: backend
+              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              ports:
+              - containerPort: 5000
+              env:
+              - name: DB_HOST
+                value: "database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com"
+              - name: DB_NAME
+                value: "ecommerce_db"
+              - name: FLASK_ENV
+                value: "production"
+              - name: CORS_ORIGINS
+                value: "${CORS_ORIGINS}"
+              - name: DB_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: DB_USER
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: DB_PASSWORD
+              - name: JWT_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: JWT_SECRET_KEY
+              - name: SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: SECRET_KEY
+              resources:
+                requests:
+                  cpu: "125m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "250m"
+                  memory: "512Mi"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 5000
+                initialDelaySeconds: 30
+                periodSeconds: 30
+                timeoutSeconds: 5
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 5000
+                initialDelaySeconds: 20
+                periodSeconds: 20
+                timeoutSeconds: 5
+                failureThreshold: 3
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        type: ClusterIP
+        selector:
+          app: backend
+        ports:
+        - port: 5000
+          targetPort: 5000
+          protocol: TCP
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: backend
+        namespace: default
+        annotations:
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/healthcheck-path: /health
+          alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+          alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+          alb.ingress.kubernetes.io/healthy-threshold-count: "3"
+          alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+      spec:
+        rules:
+        - http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: backend
+                  port:
+                    number: 5000
+      EOF
 
-  only:
-    - main
+    - envsubst < backend-manifests.yaml | kubectl apply -f -
+    - echo "🚀 Backend manifests deployed"
+
+    - kubectl rollout status deployment/backend -n default --timeout=300s
+    - echo "✅ Deployment rollout complete"
+
+    - |
+      echo "⏳ Waiting for ALB Ingress (up to 5 mins)..."
+      for i in {1..30}; do
+        BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+        if [ -n "$BACKEND_URL" ]; then
+          echo "🎉 BACKEND LIVE at: http://$BACKEND_URL"
+          if curl -f -m 10 http://$BACKEND_URL/health; then
+            echo "✅ Health check PASSED!"
+          else
+            echo "⚠️  Health check failed - check app logs"
+          fi
+          kubectl get ingress backend -n default -o yaml && break
+        fi
+        echo "⏳ ALB provisioning... ($i/30)"
+        sleep 10
+      done
+
+    - kubectl get all -n default
+    - kubectl get ingress -n default
+
+  only: main

@@ -1,264 +1,178 @@
 image: docker:24
 
 services:
-  - docker:24-dind
+
+* docker:24-dind
 
 variables:
-  DOCKER_TLS_CERTDIR: ""
-  AWS_DEFAULT_REGION: us-east-1
-  BACKEND_REPO: backend-repo
-  IMAGE_TAG: latest
-  CLUSTER_NAME: ecommerce-cluster
+DOCKER_TLS_CERTDIR: ""
+AWS_DEFAULT_REGION: us-east-1
+BACKEND_REPO: backend-repo
+IMAGE_TAG: latest
+CLUSTER_NAME: ecommerce-cluster
 
 stages:
-  - build
-  - infra
-  - deploy
 
-############################
-# BUILD IMAGE AND PUSH ECR
-############################
+* build
+* infra
+* deploy
+
+################################
+
+# BUILD AND PUSH IMAGE TO ECR
+
+################################
 
 build-backend:
-  stage: build
-  before_script:
-    - apk add --no-cache aws-cli
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-  script:
-    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
+stage: build
+before_script:
+- apk add --no-cache aws-cli
+- export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" \
-      | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+script:
+- aws ecr describe-repositories --repository-names $BACKEND_REPO || aws ecr create-repository --repository-name $BACKEND_REPO
+- aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+- docker build -t $BACKEND_REPO:$IMAGE_TAG .
+- docker tag $BACKEND_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
+- docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG
 
-    - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
+only:
+- main
 
-    - docker tag "$BACKEND_REPO:$IMAGE_TAG" \
-      "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+################################
 
-    - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+# INFRA: INSTALL KUBECTL + HELM
 
-  only:
-    - main
-
-############################
-# CREATE EKS + INSTALL TOOLS
-############################
+################################
 
 provision-eks:
-  stage: infra
-  needs: ["build-backend"]
-  image: alpine:3.18
+stage: infra
+needs: ["build-backend"]
+image: alpine:3.18
 
-  before_script:
-    - apk add --no-cache aws-cli curl bash openssl git
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+before_script:
+- apk add --no-cache aws-cli curl bash git
+- export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    # Install eksctl
-    - curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /usr/local/bin
+```
+# install kubectl
+- curl -sLO https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+- chmod +x kubectl
+- mv kubectl /usr/local/bin/
 
-    # Install kubectl
-    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    - chmod +x kubectl
-    - mv kubectl /usr/local/bin/
+# install helm
+- curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
 
-    # Install helm
-    - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+script:
+- aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $CLUSTER_NAME
 
-  script:
+```
+# install aws load balancer controller
+- helm repo add eks https://aws.github.io/eks-charts
+- helm repo update
+- helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    -n kube-system \
+    --set clusterName=$CLUSTER_NAME \
+    --set serviceAccount.create=true \
+    --set region=$AWS_DEFAULT_REGION \
+    --wait
 
-    # Configure kubeconfig
-    - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
+# install external secrets operator
+- helm repo add external-secrets https://charts.external-secrets.io
+- helm repo update
+- helm upgrade --install external-secrets external-secrets/external-secrets \
+    -n external-secrets \
+    --create-namespace \
+    --set installCRDs=true \
+    --wait
+```
 
-    ##################################
-    # INSTALL ALB CONTROLLER
-    ##################################
+only:
+- main
 
-    - helm repo add eks https://aws.github.io/eks-charts
-    - helm repo update
+################################
 
-    - |
-      helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-      -n kube-system \
-      --set clusterName=$CLUSTER_NAME \
-      --set serviceAccount.create=true \
-      --set region=$AWS_DEFAULT_REGION \
-      --set vpcId=vpc-0c94c781bb54a1008 \
-      --wait
-
-    ##################################
-    # INSTALL EXTERNAL SECRETS
-    ##################################
-
-    - helm repo add external-secrets https://charts.external-secrets.io
-    - helm repo update
-
-    - |
-      helm upgrade --install external-secrets external-secrets/external-secrets \
-      -n external-secrets \
-      --create-namespace \
-      --set installCRDs=true \
-      --wait
-
-    ##################################
-    # VERIFY CRDs
-    ##################################
-
-    - kubectl get crd clustersecretstores.external-secrets.io || exit 1
-    - kubectl get crd externalsecrets.external-secrets.io || exit 1
-
-    ##################################
-    # APPLY SECRET STORE
-    ##################################
-
-    - |
-      cat <<EOF | kubectl apply -f -
-      apiVersion: external-secrets.io/v1beta1
-      kind: ClusterSecretStore
-      metadata:
-        name: aws-secrets-manager
-      spec:
-        provider:
-          aws:
-            service: SecretsManager
-            region: us-east-1
-            auth:
-              jwt:
-                serviceAccountRef:
-                  name: external-secrets-sa
-                  namespace: external-secrets
-      EOF
-
-    ##################################
-    # APPLY EXTERNAL SECRET
-    ##################################
-
-    - |
-      cat <<EOF | kubectl apply -f -
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: backend-secret
-        namespace: default
-      spec:
-        refreshInterval: 1h
-        secretStoreRef:
-          name: aws-secrets-manager
-          kind: ClusterSecretStore
-        target:
-          name: backend-secrets
-          creationPolicy: Owner
-        data:
-        - secretKey: DB_USER
-          remoteRef:
-            key: rds-secret
-            property: username
-        - secretKey: DB_PASSWORD
-          remoteRef:
-            key: rds-secret
-            property: password
-      EOF
-
-  only:
-    - main
-
-############################
 # DEPLOY BACKEND
-############################
+
+################################
 
 deploy-backend:
-  stage: deploy
-  needs: ["provision-eks"]
-  image: alpine:3.18
+stage: deploy
+needs: ["provision-eks"]
+image: alpine:3.18
 
-  before_script:
-    - apk add --no-cache aws-cli curl bash
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+before_script:
+- apk add --no-cache aws-cli curl bash
+- export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    - chmod +x kubectl
-    - mv kubectl /usr/local/bin/
+```
+- curl -sLO https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+- chmod +x kubectl
+- mv kubectl /usr/local/bin/
 
-    - aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" --name "$CLUSTER_NAME"
+- aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $CLUSTER_NAME
+```
 
-  script:
+script:
+- |
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+name: backend
+spec:
+replicas: 1
+selector:
+matchLabels:
+app: backend
+template:
+metadata:
+labels:
+app: backend
+spec:
+containers:
+- name: backend
+image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+ports:
+- containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+name: backend
+spec:
+type: ClusterIP
+selector:
+app: backend
+ports:
+- port: 5000
+targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+name: backend
+annotations:
+kubernetes.io/ingress.class: alb
+alb.ingress.kubernetes.io/scheme: internet-facing
+alb.ingress.kubernetes.io/target-type: ip
+spec:
+rules:
+- http:
+paths:
+- path: /
+pathType: Prefix
+backend:
+service:
+name: backend
+port:
+number: 5000
+EOF
 
-    ##################################
-    # DEPLOY FLASK APP
-    ##################################
+```
+- kubectl rollout status deployment/backend --timeout=300s
+```
 
-    - |
-      cat <<EOF | kubectl apply -f -
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: backend
-      spec:
-        replicas: 1
-        selector:
-          matchLabels:
-            app: backend
-        template:
-          metadata:
-            labels:
-              app: backend
-          spec:
-            containers:
-            - name: backend
-              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
-              ports:
-              - containerPort: 5000
-              env:
-              - name: DB_HOST
-                value: database-1.cujgu046ilz9.us-east-1.rds.amazonaws.com
-              - name: DB_NAME
-                value: ecommerce_db
-              - name: FLASK_ENV
-                value: production
-              - name: DB_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_USER
-              - name: DB_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_PASSWORD
-      ---
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: backend
-      spec:
-        type: ClusterIP
-        selector:
-          app: backend
-        ports:
-        - port: 5000
-          targetPort: 5000
-      ---
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: backend
-        annotations:
-          kubernetes.io/ingress.class: alb
-          alb.ingress.kubernetes.io/scheme: internet-facing
-          alb.ingress.kubernetes.io/target-type: ip
-      spec:
-        rules:
-        - http:
-            paths:
-            - path: /
-              pathType: Prefix
-              backend:
-                service:
-                  name: backend
-                  port:
-                    number: 5000
-      EOF
-
-    - kubectl rollout status deployment/backend --timeout=5m
-
-  only:
-    - main
+only:
+- main

@@ -1,4 +1,5 @@
 image: docker:24
+
 services:
   - docker:24-dind
 
@@ -39,7 +40,7 @@ provision-eks:
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x kubectl && mv kubectl /usr/local/bin/
     - curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   script:
-    # 1. Fix IAM permissions (✅ ALREADY WORKING)
+    # 1. Fix IAM permissions
     - |
       echo "🔧 Fixing NodeGroup IAM..."
       NODE_ROLE=$(aws iam list-roles --query 'Roles[?contains(RoleName,`ecommerce-cluster-nodegroup`)]|[0].RoleName' --output text 2>/dev/null || echo "none")
@@ -47,11 +48,11 @@ provision-eks:
         aws iam attach-role-policy --role-name "$NODE_ROLE" --policy-arn arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess || true
         echo "✅ ELB permissions added: $NODE_ROLE"
       fi
-
+      
     # 2. Update kubeconfig
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
-
-    # 3. Install/upgrade ALB Controller (✅ WORKING)
+    
+    # 3. Install/upgrade ALB Controller
     - |
       echo "📦 Installing AWS Load Balancer Controller..."
       helm repo add eks https://aws.github.io/eks-charts || true
@@ -65,7 +66,7 @@ provision-eks:
         --wait --timeout=5m
       kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
 
-    # 4. Install External Secrets WITH PROPER CRD WAITING (🔧 FIXED)
+    # 4. Install External Secrets (with robust CRD waiting)
     - |
       echo "🔑 Installing External Secrets..."
       helm repo add external-secrets https://charts.external-secrets.io || true
@@ -74,21 +75,23 @@ provision-eks:
         -n external-secrets --create-namespace --wait --timeout=5m \
         --set installCRDs=true \
         --set serviceAccount.create=true
-
-      # Wait for External Secrets deployment to be ready
+      
+      echo "⏳ Waiting for External Secrets pods to be available..."
       kubectl wait --for=condition=Available deployment/external-secrets -n external-secrets --timeout=120s
-      sleep 15  # Extra buffer for CRDs
+      kubectl wait --for=condition=Available deployment/external-secrets-webhook -n external-secrets --timeout=120s || true
 
-      # Verify CRDs are ready
-      until kubectl get crd clustersecretstores.external-secrets.io &>/dev/null; do
-        echo "⏳ Waiting for External Secrets CRDs..."
-        sleep 5
-      done
-      echo "✅ External Secrets CRDs ready!"
+      echo "⏳ Waiting for CRDs to be Established by the API Server..."
+      kubectl wait --for condition=established --timeout=60s crd/clustersecretstores.external-secrets.io
+      kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io
+      echo "✅ External Secrets CRDs ready and established!"
 
     # 5. Create secrets configuration
     - |
-      cat << EOF | kubectl apply -f -
+      # Clear kubectl discovery cache to force it to see the new CRDs
+      rm -rf ~/.kube/cache
+
+      # Write the manifest to a file first for cleaner retry logic
+      cat << 'EOF' > external-secrets-config.yaml
       apiVersion: external-secrets.io/v1beta1
       kind: ClusterSecretStore
       metadata:
@@ -135,8 +138,17 @@ provision-eks:
             key: "app/backend/secrets"
             property: SECRET_KEY
       EOF
-      echo "✅ Secrets configured successfully!"
 
+      echo "⚙️ Applying secrets configuration..."
+      # Retry loop to handle any lingering webhook or API caching latency
+      for i in {1..5}; do
+        if kubectl apply -f external-secrets-config.yaml; then
+          echo "✅ Secrets configured successfully!"
+          break
+        fi
+        echo "⚠️ API not ready yet, retrying in 10 seconds... ($i/5)"
+        sleep 10
+      done
   only:
     - main
 
@@ -262,12 +274,12 @@ deploy-backend:
                   port:
                     number: 5000
       EOF
-
+      
     # Apply manifests
     - kubectl apply -f backend-manifests.yaml
     - kubectl rollout status deployment/backend -n default --timeout=300s
     - echo "✅ Backend deployment successful!"
-
+    
     # Wait for ALB provisioning and test
     - |
       echo "⏳ Waiting for ALB Load Balancer (5 minutes max)..."
@@ -287,10 +299,8 @@ deploy-backend:
         echo "⏳ ALB provisioning... ($i/300)"
         sleep 1
       done
-
     - echo "🚀 E-COMMERCE BACKEND FULLY DEPLOYED TO PRODUCTION!"
     - kubectl get all -n default
     - kubectl get ingress -n default
-
   only:
     - main

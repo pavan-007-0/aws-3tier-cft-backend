@@ -1,5 +1,6 @@
 stages:
   - validate
+  - infra
   - build
   - deploy
 
@@ -13,10 +14,14 @@ variables:
   SUBNET_A: "subnet-0951f168b0769217c"
   SUBNET_B: "subnet-0a61c37122c11d0f1"
   RDS_SG_ID: "sg-0f5f53246f5b20572"
+  NODE_INSTANCE_TYPE: "t3.medium"
+  NODE_MIN: "1"
+  NODE_MAX: "3"
+  NODE_DESIRED: "2"
 
-# ================================================
-# STAGE 1 — VALIDATE
-# ================================================
+# ==========================
+# STAGE 1 - VALIDATE
+# ==========================
 
 validate-yaml:
   stage: validate
@@ -27,42 +32,23 @@ validate-yaml:
     - yum install -y python3-pip
     - pip3 install yamllint
   script:
-    - echo "🔍 Linting .gitlab-ci.yml..."
+    - echo "Linting .gitlab-ci.yml..."
     - yamllint -d "{extends: relaxed, rules: {line-length: {max: 200}}}" .gitlab-ci.yml
-    - echo "✅ YAML syntax is valid"
+    - echo "YAML syntax valid"
   only:
     - main
 
-validate-infra:
+validate-aws-credentials:
   stage: validate
   image:
     name: amazon/aws-cli
     entrypoint: [""]
-  before_script:
-    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
-    - echo "🔍 Validating AWS credentials..."
+    - echo "Validating AWS credentials..."
     - aws sts get-caller-identity
-    - echo "✅ AWS credentials valid"
-
-    - echo "🔍 Checking EKS cluster exists..."
-    - aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" --query "cluster.status" --output text
-    - echo "✅ EKS cluster found"
-
-    - echo "🔍 Checking ECR repo exists or can be created..."
-    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || echo "ℹ️ Repo will be created during build"
-
-    - echo "🔍 Checking RDS security group exists..."
-    - aws ec2 describe-security-groups --group-ids "$RDS_SG_ID" --query "SecurityGroups[0].GroupId" --output text
-    - echo "✅ RDS security group found"
-
-    - echo "🔍 Checking subnets exist..."
-    - aws ec2 describe-subnets --subnet-ids "$SUBNET_A" "$SUBNET_B" --query "Subnets[*].SubnetId" --output text
-    - echo "✅ Subnets found"
-
-    - echo "🔍 Checking Secrets Manager secrets exist..."
-    - aws secretsmanager describe-secret --secret-id "secrets/backend/app" --query "Name" --output text
-    - echo "✅ Secrets found"
+    - echo "Region reachable..."
+    - aws ec2 describe-availability-zones --region "$AWS_DEFAULT_REGION" --query "AvailabilityZones[0].State" --output text
+    - echo "AWS credentials and region valid"
   only:
     - main
 
@@ -75,11 +61,8 @@ validate-docker:
     - yum install -y python3-pip
     - pip3 install dockerfile-parse
   script:
-    - echo "🔍 Checking Dockerfile exists..."
-    - test -f Dockerfile || (echo "❌ Dockerfile not found!" && exit 1)
-    - echo "✅ Dockerfile found"
-
-    - echo "🔍 Validating Dockerfile syntax..."
+    - echo "Checking Dockerfile..."
+    - test -f Dockerfile || (echo "ERROR Dockerfile not found" && exit 1)
     - |
       python3 << 'PYEOF'
       from dockerfile_parse import DockerfileParser
@@ -87,20 +70,61 @@ validate-docker:
           dfp = DockerfileParser(path='.')
           print(f"Base image: {dfp.baseimage}")
           print(f"Instructions: {len(dfp.structure)}")
-          print("✅ Dockerfile syntax valid")
+          print("Dockerfile syntax valid")
       except Exception as e:
-          print(f"❌ Dockerfile parse error: {e}")
+          print(f"ERROR: {e}")
           exit(1)
       PYEOF
-
-    - echo "🔍 Checking required files exist..."
-    - test -f requirements.txt || (echo "❌ requirements.txt not found!" && exit 1)
-    - echo "✅ requirements.txt found"
+    - test -f requirements.txt || (echo "ERROR requirements.txt not found" && exit 1)
+    - echo "Docker validation passed"
   only:
     - main
 
-validate-k8s-manifests:
-  stage: validate
+# ==========================
+# STAGE 2 - INFRA
+# ==========================
+
+infra-ecr:
+  stage: infra
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  script:
+    - echo "Ensuring ECR repository exists..."
+    - |
+      aws ecr describe-repositories --repository-names "$BACKEND_REPO" \
+        --region "$AWS_DEFAULT_REGION" 2>/dev/null || \
+      aws ecr create-repository \
+        --repository-name "$BACKEND_REPO" \
+        --region "$AWS_DEFAULT_REGION" \
+        --image-scanning-configuration scanOnPush=true \
+        --encryption-configuration encryptionType=AES256
+    - echo "ECR repository ready"
+  only:
+    - main
+
+infra-secrets:
+  stage: infra
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  script:
+    - echo "Ensuring Secrets Manager secret exists..."
+    - |
+      aws secretsmanager describe-secret \
+        --secret-id "secrets/backend/app" \
+        --region "$AWS_DEFAULT_REGION" 2>/dev/null || \
+      aws secretsmanager create-secret \
+        --name "secrets/backend/app" \
+        --description "Backend app secrets" \
+        --secret-string '{"JWT_SECRET_KEY":"change-me-jwt-secret","SECRET_KEY":"change-me-secret-key"}' \
+        --region "$AWS_DEFAULT_REGION"
+    - echo "Secret ready"
+  only:
+    - main
+
+infra-eks:
+  stage: infra
   image:
     name: amazon/aws-cli
     entrypoint: [""]
@@ -108,147 +132,211 @@ validate-k8s-manifests:
     - yum install -y tar gzip
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz"
+    - tar -xzf eksctl_Linux_amd64.tar.gz && mv eksctl /usr/local/bin/
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
-    - echo "🔍 Generating and dry-run validating Kubernetes manifests..."
+    - echo "Checking if EKS cluster exists..."
     - |
-      FRONTEND_URL="http://placeholder-for-validation.example.com"
-      cat > backend-manifests-validate.yaml << EOF
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: backend-secrets
-        namespace: default
-      spec:
-        refreshInterval: 1h
-        secretStoreRef:
-          name: aws-secrets-manager
-          kind: ClusterSecretStore
-        target:
-          name: backend-secrets
-          creationPolicy: Owner
-        data:
-        - secretKey: DB_USER
-          remoteRef:
-            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
-            property: username
-        - secretKey: DB_PASSWORD
-          remoteRef:
-            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
-            property: password
-        - secretKey: JWT_SECRET_KEY
-          remoteRef:
-            key: "secrets/backend/app"
-            property: JWT_SECRET_KEY
-        - secretKey: SECRET_KEY
-          remoteRef:
-            key: "secrets/backend/app"
-            property: SECRET_KEY
-      ---
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: backend
-        namespace: default
-      spec:
-        replicas: 1
-        selector:
-          matchLabels:
-            app: backend
-        template:
-          metadata:
-            labels:
-              app: backend
-          spec:
-            containers:
-            - name: backend
-              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
-              ports:
-              - containerPort: 5000
-              env:
-              - name: DB_HOST
-                value: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
-              - name: DB_NAME
-                value: "ecommerce_db"
-              - name: FLASK_ENV
-                value: "production"
-              - name: CORS_ORIGINS
-                value: "${FRONTEND_URL}"
-              - name: DB_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_USER
-              - name: DB_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_PASSWORD
-              - name: JWT_SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: JWT_SECRET_KEY
-              - name: SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: SECRET_KEY
-              resources:
-                requests:
-                  cpu: "256m"
-                  memory: "512Mi"
-      ---
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: backend
-        namespace: default
-      spec:
-        type: ClusterIP
-        selector:
-          app: backend
-        ports:
-        - port: 5000
-          targetPort: 5000
-          protocol: TCP
-      ---
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: backend
-        namespace: default
-        annotations:
-          kubernetes.io/ingress.class: alb
-          alb.ingress.kubernetes.io/scheme: internet-facing
-          alb.ingress.kubernetes.io/target-type: ip
-          alb.ingress.kubernetes.io/subnets: ${SUBNET_A}, ${SUBNET_B}
-          alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-          alb.ingress.kubernetes.io/healthcheck-path: /health
-      spec:
-        rules:
-        - http:
-            paths:
-            - path: /
-              pathType: Prefix
-              backend:
-                service:
-                  name: backend
-                  port:
-                    number: 5000
-      EOF
+      CLUSTER_EXISTS=$(aws eks describe-cluster \
+        --name "$CLUSTER_NAME" \
+        --region "$AWS_DEFAULT_REGION" \
+        --query "cluster.status" \
+        --output text 2>&1 || echo "NOT_FOUND")
 
-    - echo "🔍 Running kubectl dry-run validation..."
+      if echo "$CLUSTER_EXISTS" | grep -q "NOT_FOUND\|ResourceNotFoundException"; then
+        echo "Cluster not found. Creating EKS cluster (this takes 15-20 mins)..."
+        eksctl create cluster \
+          --name "$CLUSTER_NAME" \
+          --region "$AWS_DEFAULT_REGION" \
+          --vpc-public-subnets "$SUBNET_A,$SUBNET_B" \
+          --nodegroup-name backend-nodes \
+          --node-type "$NODE_INSTANCE_TYPE" \
+          --nodes "$NODE_DESIRED" \
+          --nodes-min "$NODE_MIN" \
+          --nodes-max "$NODE_MAX" \
+          --managed \
+          --alb-ingress-access \
+          --full-ecr-access \
+          --asg-access \
+          --with-oidc
+        echo "EKS cluster created"
+      else
+        echo "EKS cluster already exists - status: $CLUSTER_EXISTS"
+      fi
+
+    - echo "Updating kubeconfig..."
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
-    # dry-run ExternalSecret separately (CRD — server won't know it, client-side only)
-    - kubectl apply --dry-run=client -f backend-manifests-validate.yaml 2>&1 | grep -v "unknown field" || true
-    - echo "✅ Kubernetes manifests are valid"
+
+    - echo "Installing AWS Load Balancer Controller..."
+    - |
+      # Create IAM policy for ALB controller if not exists
+      POLICY_ARN=$(aws iam list-policies \
+        --query "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn" \
+        --output text)
+
+      if [ -z "$POLICY_ARN" ]; then
+        curl -sLO https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+        POLICY_ARN=$(aws iam create-policy \
+          --policy-name AWSLoadBalancerControllerIAMPolicy \
+          --policy-document file://iam_policy.json \
+          --query "Policy.Arn" --output text)
+        echo "IAM policy created: $POLICY_ARN"
+      else
+        echo "IAM policy already exists: $POLICY_ARN"
+      fi
+
+      # Create service account
+      eksctl create iamserviceaccount \
+        --cluster "$CLUSTER_NAME" \
+        --namespace kube-system \
+        --name aws-load-balancer-controller \
+        --attach-policy-arn "$POLICY_ARN" \
+        --approve \
+        --override-existing-serviceaccounts || true
+
+      # Install ALB controller via helm
+      curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
+      tar -xzf helm-v3.14.0-linux-amd64.tar.gz
+      mv linux-amd64/helm /usr/local/bin/
+
+      helm repo add eks https://aws.github.io/eks-charts
+      helm repo update
+
+      helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+        --namespace kube-system \
+        --set clusterName="$CLUSTER_NAME" \
+        --set serviceAccount.create=false \
+        --set serviceAccount.name=aws-load-balancer-controller \
+        --set region="$AWS_DEFAULT_REGION" \
+        --set vpcId="$VPC_ID" \
+        --wait || true
+
+      echo "ALB controller installed"
+
+    - echo "Installing External Secrets Operator..."
+    - |
+      helm repo add external-secrets https://charts.external-secrets.io
+      helm repo update
+
+      helm upgrade --install external-secrets external-secrets/external-secrets \
+        --namespace external-secrets \
+        --create-namespace \
+        --wait || true
+
+      echo "External Secrets Operator installed"
+
+    - echo "Creating ClusterSecretStore for AWS Secrets Manager..."
+    - |
+      # Create IRSA for External Secrets
+      POLICY_ESO=$(aws iam list-policies \
+        --query "Policies[?PolicyName=='ExternalSecretsPolicy'].Arn" \
+        --output text)
+
+      if [ -z "$POLICY_ESO" ]; then
+        aws iam create-policy \
+          --policy-name ExternalSecretsPolicy \
+          --policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret"
+              ],
+              "Resource": "*"
+            }]
+          }'
+        echo "ExternalSecrets IAM policy created"
+      fi
+
+      POLICY_ESO_ARN=$(aws iam list-policies \
+        --query "Policies[?PolicyName=='ExternalSecretsPolicy'].Arn" \
+        --output text)
+
+      eksctl create iamserviceaccount \
+        --cluster "$CLUSTER_NAME" \
+        --namespace external-secrets \
+        --name external-secrets-sa \
+        --attach-policy-arn "$POLICY_ESO_ARN" \
+        --approve \
+        --override-existing-serviceaccounts || true
+
+      ESO_ROLE_ARN=$(aws iam get-role \
+        --role-name "eksctl-${CLUSTER_NAME}-addon-iamserviceaccount-external-secrets-external-secrets-sa-Role1" \
+        --query "Role.Arn" --output text 2>/dev/null || \
+        eksctl get iamserviceaccount \
+          --cluster "$CLUSTER_NAME" \
+          --namespace external-secrets \
+          --name external-secrets-sa \
+          -o json 2>/dev/null | python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0]['status']['roleARN'])" 2>/dev/null || echo "")
+
+      kubectl apply -f - << CSSEOF
+      apiVersion: external-secrets.io/v1beta1
+      kind: ClusterSecretStore
+      metadata:
+        name: aws-secrets-manager
+      spec:
+        provider:
+          aws:
+            service: SecretsManager
+            region: ${AWS_DEFAULT_REGION}
+            auth:
+              jwt:
+                serviceAccountRef:
+                  name: external-secrets-sa
+                  namespace: external-secrets
+      CSSEOF
+
+      echo "ClusterSecretStore created"
+
+    - echo "Verifying cluster is healthy..."
+    - kubectl get nodes
+    - kubectl get pods -n kube-system | grep -E "aws-load-balancer|coredns|kube-proxy"
+    - echo "EKS cluster fully ready"
+  timeout: 40m
   only:
     - main
 
-# ================================================
-# STAGE 2 — BUILD
-# ================================================
+infra-rds-access:
+  stage: infra
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  needs: ["infra-eks"]
+  script:
+    - echo "Configuring RDS security group access from EKS..."
+    - |
+      EKS_NODE_SG=$(aws eks describe-cluster \
+        --name "$CLUSTER_NAME" \
+        --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
+        --output text)
+
+      RULE_EXISTS=$(aws ec2 describe-security-group-rules \
+        --filters \
+          Name="group-id",Values="$RDS_SG_ID" \
+          Name="ip-permission.to-port",Values="3306" \
+          Name="ip-permission.from-port",Values="3306" \
+          Name="ip-permission.protocol",Values="tcp" \
+          Name="ip-permission.user-id-group-pairs.group-id",Values="$EKS_NODE_SG" \
+        --query "SecurityGroupRules" --output text 2>/dev/null || echo "")
+
+      if [ -z "$RULE_EXISTS" ]; then
+        aws ec2 authorize-security-group-ingress \
+          --group-id "$RDS_SG_ID" \
+          --protocol tcp \
+          --port 3306 \
+          --source-group "$EKS_NODE_SG" || true
+        echo "RDS access granted from EKS nodes"
+      else
+        echo "RDS access rule already exists"
+      fi
+  only:
+    - main
+
+# ==========================
+# STAGE 3 - BUILD
+# ==========================
 
 build-backend:
   stage: build
@@ -260,29 +348,29 @@ build-backend:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
+  needs: ["infra-ecr", "infra-eks", "validate-docker"]
   before_script:
     - yum install -y docker
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
-    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || aws ecr create-repository --repository-name "$BACKEND_REPO"
     - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
     - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
     - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
-    - echo "✅ Image pushed to ECR successfully"
+    - echo "Image pushed to ECR successfully"
   only:
     - main
 
-# ================================================
-# STAGE 3 — DEPLOY
-# ================================================
+# ==========================
+# STAGE 4 - DEPLOY
+# ==========================
 
 deploy-backend:
   stage: deploy
   image:
     name: amazon/aws-cli
     entrypoint: [""]
-  needs: ["build-backend"]
+  needs: ["build-backend", "infra-rds-access"]
   before_script:
     - yum install -y tar gzip gettext jq
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -290,42 +378,15 @@ deploy-backend:
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
   script:
-    # 1. Allow EKS Nodes to access RDS
-    - |
-      echo "🔐 Authorizing EKS nodes to access RDS Database..."
-      EKS_NODE_SG=$(aws eks describe-cluster --name "$CLUSTER_NAME" --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text)
-
-      RULE_EXISTS=$(aws ec2 describe-security-group-rules \
-        --filters \
-          Name="group-id",Values="$RDS_SG_ID" \
-          Name="ip-permission.to-port",Values="3306" \
-          Name="ip-permission.from-port",Values="3306" \
-          Name="ip-permission.protocol",Values="tcp" \
-          Name="ip-permission.user-id-group-pairs.group-id",Values="$EKS_NODE_SG" \
-        --query "SecurityGroupRules" --output text)
-
-      if [ -z "$RULE_EXISTS" ]; then
-        aws ec2 authorize-security-group-ingress \
-          --group-id "$RDS_SG_ID" \
-          --protocol tcp \
-          --port 3306 \
-          --source-group "$EKS_NODE_SG" || true
-        echo "✅ Access granted from EKS ($EKS_NODE_SG) to RDS ($RDS_SG_ID)"
-      else
-        echo "✅ EKS to RDS security group rule already exists."
-      fi
-
-    # 2. Fetch Frontend URL for CORS
     - |
       FRONTEND_URL=$(aws cloudformation describe-stacks \
         --stack-name frontend-stack \
         --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" \
-        --output text || echo "http://localhost:4200")
-      echo "Detected Frontend URL: $FRONTEND_URL"
+        --output text 2>/dev/null || echo "http://localhost:4200")
+      echo "Frontend URL: $FRONTEND_URL"
 
-    # 3. Generate and Apply Kubernetes Manifests
     - |
-      echo "📦 Deploying Kubernetes Manifests..."
+      echo "Deploying Kubernetes Manifests..."
       cat > backend-manifests.yaml << EOF
       apiVersion: external-secrets.io/v1beta1
       kind: ExternalSecret
@@ -453,15 +514,15 @@ deploy-backend:
 
       kubectl apply -f backend-manifests.yaml
       kubectl rollout status deployment/backend -n default --timeout=300s
-      echo "✅ Backend successfully deployed to EKS!"
+      echo "Backend deployed successfully"
 
-    # 4. Wait for ALB URL
     - |
-      echo "⏳ Waiting for ALB Load Balancer to provision..."
+      echo "Waiting for ALB to provision..."
       for i in {1..120}; do
-        BACKEND_URL=$(kubectl get ingress backend -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+        BACKEND_URL=$(kubectl get ingress backend -n default \
+          -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
         if [ -n "$BACKEND_URL" ]; then
-          echo "🎉 BACKEND LIVE AT: http://$BACKEND_URL"
+          echo "BACKEND LIVE AT: http://$BACKEND_URL"
           break
         fi
         sleep 5

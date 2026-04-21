@@ -19,6 +19,7 @@ variables:
   NODE_MIN: "1"
   NODE_MAX: "3"
   NODE_DESIRED: "2"
+  ESO_CHART_VERSION: "0.20.4"
 
 # ==========================
 # STAGE 1 - VALIDATE
@@ -528,27 +529,36 @@ infra-eks:
     - |
       helm repo add external-secrets https://charts.external-secrets.io
       helm repo update
+      # Pinning the chart version so we know which CRD apiVersion (v1) is served.
+      # ESO >= 0.10.0 removed v1beta1 in favor of v1.
       helm upgrade --install external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --create-namespace \
+        --version "$ESO_CHART_VERSION" \
         --wait
-      echo "External Secrets Operator installed"
+      echo "External Secrets Operator installed (chart version $ESO_CHART_VERSION)"
 
       # Wait for ESO CRDs to be fully registered in the Kubernetes API server
       # Helm --wait only ensures pods are ready, not that CRDs are fully discoverable
       echo "Waiting for External Secrets CRDs to be registered..."
       for i in $(seq 1 30); do
-        if kubectl get crd clustersecretstores.external-secrets.io >/dev/null 2>&1; then
-          echo "CRD clustersecretstores.external-secrets.io is ready (attempt $i)"
+        if kubectl get crd clustersecretstores.external-secrets.io >/dev/null 2>&1 \
+           && kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1; then
+          echo "ESO CRDs are ready (attempt $i)"
           break
         fi
         if [ "$i" = "30" ]; then
-          echo "ERROR: CRD clustersecretstores.external-secrets.io never became available"
+          echo "ERROR: ESO CRDs never became available"
           exit 1
         fi
-        echo "Attempt $i/30 - CRD not ready yet, waiting 10s..."
+        echo "Attempt $i/30 - CRDs not ready yet, waiting 10s..."
         sleep 10
       done
+
+      # Confirm v1 is being served (will fail loudly if chart was downgraded)
+      echo "Verifying external-secrets.io/v1 is served..."
+      kubectl get --raw /apis/external-secrets.io/v1 >/dev/null
+      echo "external-secrets.io/v1 confirmed available"
 
       # Also wait for ESO controller and webhook deployments to be fully rolled out
       echo "Waiting for ESO controller deployment..."
@@ -587,7 +597,7 @@ infra-eks:
     - echo "Creating ClusterSecretStore..."
     - |
       printf '%s\n' \
-        "apiVersion: external-secrets.io/v1beta1" \
+        "apiVersion: external-secrets.io/v1" \
         "kind: ClusterSecretStore" \
         "metadata:" \
         "  name: aws-secrets-manager" \
@@ -712,7 +722,7 @@ deploy-backend:
       echo "Subnet B:     $SUBNET_B"
 
       printf '%s\n' \
-        "apiVersion: external-secrets.io/v1beta1" \
+        "apiVersion: external-secrets.io/v1" \
         "kind: ExternalSecret" \
         "metadata:" \
         "  name: backend-secrets" \

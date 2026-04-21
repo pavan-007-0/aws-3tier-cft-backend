@@ -87,24 +87,24 @@ validate-docker:
     - echo "Checking Dockerfile exists..."
     - test -f Dockerfile || (echo "ERROR Dockerfile not found" && exit 1)
     - |
-      python3 << 'PYEOF'
+      python3 -c "
       from dockerfile_parse import DockerfileParser
       try:
           dfp = DockerfileParser(path='.')
-          print(f"Base image: {dfp.baseimage}")
-          print(f"Total instructions: {len(dfp.structure)}")
+          print('Base image: ' + str(dfp.baseimage))
+          print('Total instructions: ' + str(len(dfp.structure)))
           required = ['FROM', 'WORKDIR', 'COPY', 'RUN', 'CMD']
           found = [s['instruction'] for s in dfp.structure]
           for r in required:
               if r in found:
-                  print(f"OK: {r} instruction found")
+                  print('OK: ' + r + ' instruction found')
               else:
-                  print(f"WARNING: {r} instruction not found")
-          print("Dockerfile validation passed")
+                  print('WARNING: ' + r + ' instruction not found')
+          print('Dockerfile validation passed')
       except Exception as e:
-          print(f"ERROR: {e}")
+          print('ERROR: ' + str(e))
           exit(1)
-      PYEOF
+      "
     - echo "Checking requirements.txt exists and is not empty..."
     - test -f requirements.txt || (echo "ERROR requirements.txt not found" && exit 1)
     - test -s requirements.txt || (echo "ERROR requirements.txt is empty" && exit 1)
@@ -346,8 +346,9 @@ infra-secrets:
 
 # ==========================
 # STAGE 3 - INFRA CLUSTER
-# eksctl config file approach
+# eksctl config via python
 # explicitly disables NAT
+# NO heredocs used here
 # ==========================
 
 infra-eks:
@@ -356,7 +357,7 @@ infra-eks:
     name: amazon/aws-cli
     entrypoint: [""]
   before_script:
-    - yum install -y tar gzip
+    - yum install -y tar gzip python3
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz"
@@ -395,51 +396,54 @@ infra-eks:
           --output text 2>/dev/null || echo "1.32")
         echo "EKS version: $EKS_VERSION"
 
-        # Use eksctl config file to explicitly control networking
-        # publicSubnets only = no private subnets = no NAT gateway needed
-        cat > /tmp/eksctl-config.yaml << EKSEOF
-        apiVersion: eksctl.io/v1alpha5
-        kind: ClusterConfig
-        metadata:
-          name: ${CLUSTER_NAME}
-          region: ${AWS_DEFAULT_REGION}
-          version: "${EKS_VERSION}"
-        iam:
-          withOIDC: true
-        vpc:
-          id: ${VPC_ID}
-          subnets:
-            public:
-              public-a:
-                id: ${SUBNET_A}
-              public-b:
-                id: ${SUBNET_B}
-          nat:
-            gateway: Disable
-        managedNodeGroups:
-          - name: backend-nodes
-            instanceType: ${NODE_INSTANCE_TYPE}
-            minSize: ${NODE_MIN}
-            maxSize: ${NODE_MAX}
-            desiredCapacity: ${NODE_DESIRED}
-            amiFamily: AmazonLinux2
-            subnets:
-              - ${SUBNET_A}
-              - ${SUBNET_B}
-            iam:
-              attachPolicyARNs:
-                - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
-                - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-                - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-                - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
-            ssh:
-              allow: false
-        addons:
-          - name: vpc-cni
-          - name: coredns
-          - name: kube-proxy
-        EKSEOF
+        export VPC_ID SUBNET_A SUBNET_B EKS_VERSION
+        printf '%s\n' \
+          "apiVersion: eksctl.io/v1alpha5" \
+          "kind: ClusterConfig" \
+          "metadata:" \
+          "  name: ${CLUSTER_NAME}" \
+          "  region: ${AWS_DEFAULT_REGION}" \
+          "  version: \"${EKS_VERSION}\"" \
+          "iam:" \
+          "  withOIDC: true" \
+          "vpc:" \
+          "  id: ${VPC_ID}" \
+          "  subnets:" \
+          "    public:" \
+          "      public-a:" \
+          "        id: ${SUBNET_A}" \
+          "      public-b:" \
+          "        id: ${SUBNET_B}" \
+          "  nat:" \
+          "    gateway: Disable" \
+          "managedNodeGroups:" \
+          "  - name: backend-nodes" \
+          "    instanceType: ${NODE_INSTANCE_TYPE}" \
+          "    minSize: ${NODE_MIN}" \
+          "    maxSize: ${NODE_MAX}" \
+          "    desiredCapacity: ${NODE_DESIRED}" \
+          "    amiFamily: AmazonLinux2" \
+          "    subnets:" \
+          "      - ${SUBNET_A}" \
+          "      - ${SUBNET_B}" \
+          "    iam:" \
+          "      attachPolicyARNs:" \
+          "        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy" \
+          "        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy" \
+          "        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly" \
+          "        - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess" \
+          "    ssh:" \
+          "      allow: false" \
+          "addons:" \
+          "  - name: vpc-cni" \
+          "  - name: coredns" \
+          "  - name: kube-proxy" \
+          > /tmp/eksctl-config.yaml
+        echo "eksctl config written successfully"
 
+        echo "--- eksctl config preview ---"
+        cat /tmp/eksctl-config.yaml
+        echo "-----------------------------"
         eksctl create cluster -f /tmp/eksctl-config.yaml
         echo "EKS cluster created - public nodes only, no NAT gateway, no Elastic IPs"
       else
@@ -557,7 +561,22 @@ infra-eks:
 
     - echo "Creating ClusterSecretStore..."
     - |
-      printf 'apiVersion: external-secrets.io/v1beta1\nkind: ClusterSecretStore\nmetadata:\n  name: aws-secrets-manager\nspec:\n  provider:\n    aws:\n      service: SecretsManager\n      region: %s\n      auth:\n        jwt:\n          serviceAccountRef:\n            name: external-secrets-sa\n            namespace: external-secrets\n' "$AWS_DEFAULT_REGION" > /tmp/cluster-secret-store.yaml
+      printf '%s\n' \
+        "apiVersion: external-secrets.io/v1beta1" \
+        "kind: ClusterSecretStore" \
+        "metadata:" \
+        "  name: aws-secrets-manager" \
+        "spec:" \
+        "  provider:" \
+        "    aws:" \
+        "      service: SecretsManager" \
+        "      region: ${AWS_DEFAULT_REGION}" \
+        "      auth:" \
+        "        jwt:" \
+        "          serviceAccountRef:" \
+        "            name: external-secrets-sa" \
+        "            namespace: external-secrets" \
+        > /tmp/cluster-secret-store.yaml
       kubectl apply -f /tmp/cluster-secret-store.yaml
       echo "ClusterSecretStore created"
 
@@ -571,11 +590,11 @@ infra-eks:
 
       RULE_EXISTS=$(aws ec2 describe-security-group-rules \
         --filters \
-          Name="group-id",Values="$RDS_SG_ID" \
-          Name="ip-permission.to-port",Values="3306" \
-          Name="ip-permission.from-port",Values="3306" \
-          Name="ip-permission.protocol",Values="tcp" \
-          Name="ip-permission.user-id-group-pairs.group-id",Values="$EKS_NODE_SG" \
+          "Name=group-id,Values=$RDS_SG_ID" \
+          "Name=ip-permission.to-port,Values=3306" \
+          "Name=ip-permission.from-port,Values=3306" \
+          "Name=ip-permission.protocol,Values=tcp" \
+          "Name=ip-permission.user-id-group-pairs.group-id,Values=$EKS_NODE_SG" \
         --query "SecurityGroupRules" --output text 2>/dev/null || echo "")
 
       if [ -z "$RULE_EXISTS" ]; then
@@ -645,135 +664,171 @@ deploy-backend:
     entrypoint: [""]
   needs: ["build-backend"]
   before_script:
-    - yum install -y tar gzip gettext jq
+    - yum install -y tar gzip gettext jq python3
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
   script:
+    - echo "Reading SSM values and generating manifests..."
     - |
       SUBNET_A=$(aws ssm get-parameter --name "/ecommerce/subnet-a" --query "Parameter.Value" --output text)
       SUBNET_B=$(aws ssm get-parameter --name "/ecommerce/subnet-b" --query "Parameter.Value" --output text)
       export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      export SUBNET_A SUBNET_B
 
       FRONTEND_URL=$(aws cloudformation describe-stacks \
         --stack-name frontend-stack \
         --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" \
         --output text 2>/dev/null || echo "http://localhost:4200")
+      export FRONTEND_URL
       echo "Frontend URL: $FRONTEND_URL"
       echo "Subnet A:     $SUBNET_A"
       echo "Subnet B:     $SUBNET_B"
 
-      printf 'apiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: backend-secrets\n  namespace: default\nspec:\n  refreshInterval: 1h\n  secretStoreRef:\n    name: aws-secrets-manager\n    kind: ClusterSecretStore\n  target:\n    name: backend-secrets\n    creationPolicy: Owner\n  data:\n  - secretKey: DB_USER\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: username\n  - secretKey: DB_PASSWORD\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: password\n  - secretKey: JWT_SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: JWT_SECRET_KEY\n  - secretKey: SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: SECRET_KEY\n' > /tmp/external-secret.yaml
+      printf '%s\n' \
+        "apiVersion: external-secrets.io/v1beta1" \
+        "kind: ExternalSecret" \
+        "metadata:" \
+        "  name: backend-secrets" \
+        "  namespace: default" \
+        "spec:" \
+        "  refreshInterval: 1h" \
+        "  secretStoreRef:" \
+        "    name: aws-secrets-manager" \
+        "    kind: ClusterSecretStore" \
+        "  target:" \
+        "    name: backend-secrets" \
+        "    creationPolicy: Owner" \
+        "  data:" \
+        "  - secretKey: DB_USER" \
+        "    remoteRef:" \
+        "      key: rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" \
+        "      property: username" \
+        "  - secretKey: DB_PASSWORD" \
+        "    remoteRef:" \
+        "      key: rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" \
+        "      property: password" \
+        "  - secretKey: JWT_SECRET_KEY" \
+        "    remoteRef:" \
+        "      key: secrets/backend/app" \
+        "      property: JWT_SECRET_KEY" \
+        "  - secretKey: SECRET_KEY" \
+        "    remoteRef:" \
+        "      key: secrets/backend/app" \
+        "      property: SECRET_KEY" \
+        > /tmp/external-secret.yaml
 
-      cat > /tmp/backend-deployment.yaml << EOF
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: backend
-        namespace: default
-      spec:
-        replicas: 1
-        selector:
-          matchLabels:
-            app: backend
-        template:
-          metadata:
-            labels:
-              app: backend
-          spec:
-            containers:
-            - name: backend
-              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
-              ports:
-              - containerPort: 5000
-              env:
-              - name: DB_HOST
-                value: "${RDS_ENDPOINT}"
-              - name: DB_NAME
-                value: "ecommerce_db"
-              - name: FLASK_ENV
-                value: "production"
-              - name: CORS_ORIGINS
-                value: "${FRONTEND_URL}"
-              - name: DB_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_USER
-              - name: DB_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: DB_PASSWORD
-              - name: JWT_SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: JWT_SECRET_KEY
-              - name: SECRET_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: backend-secrets
-                    key: SECRET_KEY
-              resources:
-                requests:
-                  cpu: "256m"
-                  memory: "512Mi"
-      ---
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: backend
-        namespace: default
-      spec:
-        type: ClusterIP
-        selector:
-          app: backend
-        ports:
-        - port: 5000
-          targetPort: 5000
-          protocol: TCP
-      ---
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
-      metadata:
-        name: backend
-        namespace: default
-        annotations:
-          kubernetes.io/ingress.class: alb
-          alb.ingress.kubernetes.io/scheme: internet-facing
-          alb.ingress.kubernetes.io/target-type: ip
-          alb.ingress.kubernetes.io/subnets: ${SUBNET_A}, ${SUBNET_B}
-          alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-          alb.ingress.kubernetes.io/healthcheck-path: /health
-      spec:
-        rules:
-        - http:
-            paths:
-            - path: /
-              pathType: Prefix
-              backend:
-                service:
-                  name: backend
-                  port:
-                    number: 5000
-      EOF
+      printf '%s\n' \
+        "apiVersion: apps/v1" \
+        "kind: Deployment" \
+        "metadata:" \
+        "  name: backend" \
+        "  namespace: default" \
+        "spec:" \
+        "  replicas: 1" \
+        "  selector:" \
+        "    matchLabels:" \
+        "      app: backend" \
+        "  template:" \
+        "    metadata:" \
+        "      labels:" \
+        "        app: backend" \
+        "    spec:" \
+        "      containers:" \
+        "      - name: backend" \
+        "        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}" \
+        "        ports:" \
+        "        - containerPort: 5000" \
+        "        env:" \
+        "        - name: DB_HOST" \
+        "          value: \"${RDS_ENDPOINT}\"" \
+        "        - name: DB_NAME" \
+        "          value: ecommerce_db" \
+        "        - name: FLASK_ENV" \
+        "          value: production" \
+        "        - name: CORS_ORIGINS" \
+        "          value: \"${FRONTEND_URL}\"" \
+        "        - name: DB_USER" \
+        "          valueFrom:" \
+        "            secretKeyRef:" \
+        "              name: backend-secrets" \
+        "              key: DB_USER" \
+        "        - name: DB_PASSWORD" \
+        "          valueFrom:" \
+        "            secretKeyRef:" \
+        "              name: backend-secrets" \
+        "              key: DB_PASSWORD" \
+        "        - name: JWT_SECRET_KEY" \
+        "          valueFrom:" \
+        "            secretKeyRef:" \
+        "              name: backend-secrets" \
+        "              key: JWT_SECRET_KEY" \
+        "        - name: SECRET_KEY" \
+        "          valueFrom:" \
+        "            secretKeyRef:" \
+        "              name: backend-secrets" \
+        "              key: SECRET_KEY" \
+        "        resources:" \
+        "          requests:" \
+        "            cpu: 256m" \
+        "            memory: 512Mi" \
+        "---" \
+        "apiVersion: v1" \
+        "kind: Service" \
+        "metadata:" \
+        "  name: backend" \
+        "  namespace: default" \
+        "spec:" \
+        "  type: ClusterIP" \
+        "  selector:" \
+        "    app: backend" \
+        "  ports:" \
+        "  - port: 5000" \
+        "    targetPort: 5000" \
+        "    protocol: TCP" \
+        "---" \
+        "apiVersion: networking.k8s.io/v1" \
+        "kind: Ingress" \
+        "metadata:" \
+        "  name: backend" \
+        "  namespace: default" \
+        "  annotations:" \
+        "    kubernetes.io/ingress.class: alb" \
+        "    alb.ingress.kubernetes.io/scheme: internet-facing" \
+        "    alb.ingress.kubernetes.io/target-type: ip" \
+        "    alb.ingress.kubernetes.io/subnets: ${SUBNET_A},${SUBNET_B}" \
+        "    alb.ingress.kubernetes.io/listen-ports: '[{\"HTTP\": 80}]'" \
+        "    alb.ingress.kubernetes.io/healthcheck-path: /health" \
+        "spec:" \
+        "  rules:" \
+        "  - http:" \
+        "      paths:" \
+        "      - path: /" \
+        "        pathType: Prefix" \
+        "        backend:" \
+        "          service:" \
+        "            name: backend" \
+        "            port:" \
+        "              number: 5000" \
+        > /tmp/backend-deployment.yaml
+      echo "All manifests written successfully"
 
       kubectl apply -f /tmp/external-secret.yaml
       kubectl apply -f /tmp/backend-deployment.yaml
       kubectl rollout status deployment/backend -n default --timeout=300s
       echo "Backend deployed successfully"
 
+    - echo "Waiting for ALB to provision..."
     - |
-      echo "Waiting for ALB to provision..."
-      for i in {1..120}; do
+      for i in $(seq 1 120); do
         BACKEND_URL=$(kubectl get ingress backend -n default \
           -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
         if [ -n "$BACKEND_URL" ]; then
           echo "BACKEND LIVE AT: http://$BACKEND_URL"
           break
         fi
+        echo "Attempt $i/120 - waiting for ALB..."
         sleep 5
       done
   only:

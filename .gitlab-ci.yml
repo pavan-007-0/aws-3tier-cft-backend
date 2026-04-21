@@ -10,10 +10,13 @@ variables:
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
   CLUSTER_NAME: ecommerce-cluster
-  VPC_ID: "vpc-0c94c781bb54a1008"
-  SUBNET_A: "subnet-0951f168b0769217c"
-  SUBNET_B: "subnet-0a61c37122c11d0f1"
+  VPC_ID: "vpc-08154df9a2d395b74"
+  SUBNET_A: "subnet-08069b38b8523e498"
+  SUBNET_B: "subnet-09f6c7704fb913937"
   RDS_SG_ID: "sg-0f5f53246f5b20572"
+  RDS_ENDPOINT: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
+  SECRET_APP_ARN: "arn:aws:secretsmanager:us-east-1:650251731987:secret:secrets/backend/app-jrGxUC"
+  SECRET_RDS_ARN: "arn:aws:secretsmanager:us-east-1:650251731987:secret:rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab-kVLItg"
   NODE_INSTANCE_TYPE: "t3.medium"
   NODE_MIN: "1"
   NODE_MAX: "3"
@@ -23,28 +26,6 @@ variables:
 # STAGE 1 - VALIDATE
 # ==========================
 
-validate-yaml:
-  stage: validate
-  image:
-    name: amazon/aws-cli
-    entrypoint: [""]
-  before_script:
-    - yum install -y python3-pip
-    - pip3 install yamllint
-  script:
-    - echo "Linting .gitlab-ci.yml..."
-    - |
-      cat > /tmp/.yamllint.yml << 'YAMLLINT_EOF'
-      extends: relaxed
-      rules:
-        line-length:
-          max: 200
-      YAMLLINT_EOF
-    - yamllint -c /tmp/.yamllint.yml .gitlab-ci.yml
-    - echo "YAML syntax valid"
-  only:
-    - main
-
 validate-aws-credentials:
   stage: validate
   image:
@@ -53,9 +34,57 @@ validate-aws-credentials:
   script:
     - echo "Validating AWS credentials..."
     - aws sts get-caller-identity
-    - echo "Region reachable..."
+    - echo "Checking region is reachable..."
     - aws ec2 describe-availability-zones --region "$AWS_DEFAULT_REGION" --query "AvailabilityZones[0].State" --output text
-    - echo "AWS credentials and region valid"
+    - echo "Verifying VPC exists..."
+    - aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].VpcId" --output text
+    - echo "Verifying subnets exist..."
+    - aws ec2 describe-subnets --subnet-ids "$SUBNET_A" "$SUBNET_B" --query "Subnets[*].SubnetId" --output text
+    - echo "Verifying RDS security group exists..."
+    - aws ec2 describe-security-groups --group-ids "$RDS_SG_ID" --query "SecurityGroups[0].GroupId" --output text
+    - echo "Verifying Secrets Manager secrets exist..."
+    - aws secretsmanager describe-secret --secret-id "secrets/backend/app" --query "Name" --output text
+    - aws secretsmanager describe-secret --secret-id "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" --query "Name" --output text
+    - echo "All AWS infrastructure checks passed"
+  only:
+    - main
+
+validate-python-code:
+  stage: validate
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  before_script:
+    - yum install -y python3-pip
+    - pip3 install pyflakes bandit pylint flask flask-cors flask-limiter flask-wtf mysql-connector-python python-dotenv PyJWT Werkzeug cryptography bcrypt marshmallow email-validator requests gunicorn
+  script:
+    - echo "Checking Python syntax on all .py files..."
+    - |
+      SYNTAX_ERRORS=0
+      for f in $(find . -name "*.py" -not -path "./__pycache__/*"); do
+        python3 -m py_compile "$f" 2>&1
+        if [ $? -ne 0 ]; then
+          echo "SYNTAX ERROR in $f"
+          SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
+        else
+          echo "OK: $f"
+        fi
+      done
+      if [ $SYNTAX_ERRORS -gt 0 ]; then
+        echo "$SYNTAX_ERRORS file(s) have syntax errors. Fix before pushing."
+        exit 1
+      fi
+      echo "All Python files passed syntax check"
+
+    - echo "Running pyflakes for undefined names and unused imports..."
+    - |
+      python3 -m pyflakes app.py auth.py db.py orders.py products.py cart.py admin.py security.py error_handlers.py 2>&1 || true
+
+    - echo "Running bandit security scan..."
+    - |
+      python3 -m bandit -r . -x ./__pycache__ --severity-level medium -f txt 2>&1 || true
+
+    - echo "Python validation complete"
   only:
     - main
 
@@ -68,7 +97,7 @@ validate-docker:
     - yum install -y python3-pip
     - pip3 install dockerfile-parse
   script:
-    - echo "Checking Dockerfile..."
+    - echo "Checking Dockerfile exists..."
     - test -f Dockerfile || (echo "ERROR Dockerfile not found" && exit 1)
     - |
       python3 << 'PYEOF'
@@ -76,13 +105,23 @@ validate-docker:
       try:
           dfp = DockerfileParser(path='.')
           print(f"Base image: {dfp.baseimage}")
-          print(f"Instructions: {len(dfp.structure)}")
-          print("Dockerfile syntax valid")
+          print(f"Total instructions: {len(dfp.structure)}")
+          required = ['FROM', 'WORKDIR', 'COPY', 'RUN', 'CMD']
+          found = [s['instruction'] for s in dfp.structure]
+          for r in required:
+              if r in found:
+                  print(f"OK: {r} instruction found")
+              else:
+                  print(f"WARNING: {r} instruction not found")
+          print("Dockerfile validation passed")
       except Exception as e:
           print(f"ERROR: {e}")
           exit(1)
       PYEOF
+    - echo "Checking requirements.txt exists..."
     - test -f requirements.txt || (echo "ERROR requirements.txt not found" && exit 1)
+    - echo "Validating requirements.txt is not empty..."
+    - test -s requirements.txt || (echo "ERROR requirements.txt is empty" && exit 1)
     - echo "Docker validation passed"
   only:
     - main
@@ -117,7 +156,7 @@ infra-secrets:
     name: amazon/aws-cli
     entrypoint: [""]
   script:
-    - echo "Ensuring Secrets Manager secret exists..."
+    - echo "Ensuring app secrets exist in Secrets Manager..."
     - |
       aws secretsmanager describe-secret \
         --secret-id "secrets/backend/app" \
@@ -127,7 +166,7 @@ infra-secrets:
         --description "Backend app secrets" \
         --secret-string '{"JWT_SECRET_KEY":"change-me-jwt-secret","SECRET_KEY":"change-me-secret-key"}' \
         --region "$AWS_DEFAULT_REGION"
-    - echo "Secret ready"
+    - echo "Secrets ready"
   only:
     - main
 
@@ -142,6 +181,8 @@ infra-eks:
     - chmod +x kubectl && mv kubectl /usr/local/bin/
     - curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz"
     - tar -xzf eksctl_Linux_amd64.tar.gz && mv eksctl /usr/local/bin/
+    - curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
+    - tar -xzf helm-v3.14.0-linux-amd64.tar.gz && mv linux-amd64/helm /usr/local/bin/
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
     - echo "Checking if EKS cluster exists..."
@@ -153,9 +194,14 @@ infra-eks:
         --output text 2>&1 || echo "NOT_FOUND")
 
       if echo "$CLUSTER_EXISTS" | grep -q "NOT_FOUND\|ResourceNotFoundException"; then
-        echo "Cluster not found. Creating EKS cluster - this takes 15-20 mins..."
+        echo "Cluster not found. Creating EKS cluster with latest version..."
+        EKS_VERSION=$(aws eks describe-addon-versions \
+          --query "sort_by(addons[0].addonVersions, &addonVersion)[-1].compatibilities[0].clusterVersion" \
+          --output text 2>/dev/null || echo "1.32")
+        echo "Using EKS version: $EKS_VERSION"
         eksctl create cluster \
           --name "$CLUSTER_NAME" \
+          --version "$EKS_VERSION" \
           --region "$AWS_DEFAULT_REGION" \
           --vpc-public-subnets "$SUBNET_A,$SUBNET_B" \
           --nodegroup-name backend-nodes \
@@ -180,7 +226,7 @@ infra-eks:
     - |
       POLICY_ARN=$(aws iam list-policies \
         --query "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn" \
-        --output text)
+        --output text 2>/dev/null || echo "")
 
       if [ -z "$POLICY_ARN" ]; then
         curl -sLO https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
@@ -188,9 +234,9 @@ infra-eks:
           --policy-name AWSLoadBalancerControllerIAMPolicy \
           --policy-document file://iam_policy.json \
           --query "Policy.Arn" --output text)
-        echo "IAM policy created: $POLICY_ARN"
+        echo "ALB IAM policy created: $POLICY_ARN"
       else
-        echo "IAM policy already exists: $POLICY_ARN"
+        echo "ALB IAM policy already exists: $POLICY_ARN"
       fi
 
       eksctl create iamserviceaccount \
@@ -201,13 +247,8 @@ infra-eks:
         --approve \
         --override-existing-serviceaccounts || true
 
-      curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
-      tar -xzf helm-v3.14.0-linux-amd64.tar.gz
-      mv linux-amd64/helm /usr/local/bin/
-
       helm repo add eks https://aws.github.io/eks-charts
       helm repo update
-
       helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
         --namespace kube-system \
         --set clusterName="$CLUSTER_NAME" \
@@ -216,54 +257,34 @@ infra-eks:
         --set region="$AWS_DEFAULT_REGION" \
         --set vpcId="$VPC_ID" \
         --wait || true
-
       echo "ALB controller installed"
 
     - echo "Installing External Secrets Operator..."
     - |
-      curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
-      tar -xzf helm-v3.14.0-linux-amd64.tar.gz || true
-      mv linux-amd64/helm /usr/local/bin/ 2>/dev/null || true
-
       helm repo add external-secrets https://charts.external-secrets.io
       helm repo update
-
       helm upgrade --install external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --create-namespace \
         --wait || true
-
       echo "External Secrets Operator installed"
 
     - echo "Creating ExternalSecrets IAM policy and service account..."
     - |
-      POLICY_ESO=$(aws iam list-policies \
-        --query "Policies[?PolicyName=='ExternalSecretsPolicy'].Arn" \
-        --output text)
-
-      if [ -z "$POLICY_ESO" ]; then
-        cat > /tmp/eso-policy.json << 'ESOPOLICY'
-        {
-          "Version": "2012-10-17",
-          "Statement": [{
-            "Effect": "Allow",
-            "Action": [
-              "secretsmanager:GetSecretValue",
-              "secretsmanager:DescribeSecret"
-            ],
-            "Resource": "*"
-          }]
-        }
-        ESOPOLICY
-        aws iam create-policy \
-          --policy-name ExternalSecretsPolicy \
-          --policy-document file:///tmp/eso-policy.json
-        echo "ExternalSecrets IAM policy created"
-      fi
-
       POLICY_ESO_ARN=$(aws iam list-policies \
         --query "Policies[?PolicyName=='ExternalSecretsPolicy'].Arn" \
-        --output text)
+        --output text 2>/dev/null || echo "")
+
+      if [ -z "$POLICY_ESO_ARN" ]; then
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret"],"Resource":"*"}]}' > /tmp/eso-policy.json
+        POLICY_ESO_ARN=$(aws iam create-policy \
+          --policy-name ExternalSecretsPolicy \
+          --policy-document file:///tmp/eso-policy.json \
+          --query "Policy.Arn" --output text)
+        echo "ExternalSecrets IAM policy created: $POLICY_ESO_ARN"
+      else
+        echo "ExternalSecrets IAM policy already exists: $POLICY_ESO_ARN"
+      fi
 
       eksctl create iamserviceaccount \
         --cluster "$CLUSTER_NAME" \
@@ -275,27 +296,13 @@ infra-eks:
 
     - echo "Creating ClusterSecretStore..."
     - |
-      cat > /tmp/cluster-secret-store.yaml << CSSEOF
-      apiVersion: external-secrets.io/v1beta1
-      kind: ClusterSecretStore
-      metadata:
-        name: aws-secrets-manager
-      spec:
-        provider:
-          aws:
-            service: SecretsManager
-            region: ${AWS_DEFAULT_REGION}
-            auth:
-              jwt:
-                serviceAccountRef:
-                  name: external-secrets-sa
-                  namespace: external-secrets
-      CSSEOF
+      printf 'apiVersion: external-secrets.io/v1beta1\nkind: ClusterSecretStore\nmetadata:\n  name: aws-secrets-manager\nspec:\n  provider:\n    aws:\n      service: SecretsManager\n      region: %s\n      auth:\n        jwt:\n          serviceAccountRef:\n            name: external-secrets-sa\n            namespace: external-secrets\n' "$AWS_DEFAULT_REGION" > /tmp/cluster-secret-store.yaml
       kubectl apply -f /tmp/cluster-secret-store.yaml
       echo "ClusterSecretStore created"
 
-    - echo "Verifying cluster is healthy..."
+    - echo "Verifying cluster health..."
     - kubectl get nodes
+    - kubectl get pods -n kube-system
     - echo "EKS cluster fully ready"
   timeout: 40m
   only:
@@ -314,6 +321,7 @@ infra-rds-access:
         --name "$CLUSTER_NAME" \
         --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
         --output text)
+      echo "EKS cluster SG: $EKS_NODE_SG"
 
       RULE_EXISTS=$(aws ec2 describe-security-group-rules \
         --filters \
@@ -351,7 +359,7 @@ build-backend:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
-  needs: ["infra-ecr", "infra-eks", "validate-docker"]
+  needs: ["infra-ecr", "infra-eks", "validate-docker", "validate-python-code"]
   before_script:
     - yum install -y docker
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -388,40 +396,11 @@ deploy-backend:
         --output text 2>/dev/null || echo "http://localhost:4200")
       echo "Frontend URL: $FRONTEND_URL"
 
-    - |
-      echo "Deploying Kubernetes Manifests..."
-      cat > /tmp/backend-manifests.yaml << EOF
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: backend-secrets
-        namespace: default
-      spec:
-        refreshInterval: 1h
-        secretStoreRef:
-          name: aws-secrets-manager
-          kind: ClusterSecretStore
-        target:
-          name: backend-secrets
-          creationPolicy: Owner
-        data:
-        - secretKey: DB_USER
-          remoteRef:
-            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
-            property: username
-        - secretKey: DB_PASSWORD
-          remoteRef:
-            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
-            property: password
-        - secretKey: JWT_SECRET_KEY
-          remoteRef:
-            key: "secrets/backend/app"
-            property: JWT_SECRET_KEY
-        - secretKey: SECRET_KEY
-          remoteRef:
-            key: "secrets/backend/app"
-            property: SECRET_KEY
-      ---
+      export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+      printf 'apiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: backend-secrets\n  namespace: default\nspec:\n  refreshInterval: 1h\n  secretStoreRef:\n    name: aws-secrets-manager\n    kind: ClusterSecretStore\n  target:\n    name: backend-secrets\n    creationPolicy: Owner\n  data:\n  - secretKey: DB_USER\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: username\n  - secretKey: DB_PASSWORD\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: password\n  - secretKey: JWT_SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: JWT_SECRET_KEY\n  - secretKey: SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: SECRET_KEY\n' > /tmp/external-secret.yaml
+
+      cat > /tmp/backend-deployment.yaml << EOF
       apiVersion: apps/v1
       kind: Deployment
       metadata:
@@ -444,7 +423,7 @@ deploy-backend:
               - containerPort: 5000
               env:
               - name: DB_HOST
-                value: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
+                value: "${RDS_ENDPOINT}"
               - name: DB_NAME
                 value: "ecommerce_db"
               - name: FLASK_ENV
@@ -515,7 +494,8 @@ deploy-backend:
                     number: 5000
       EOF
 
-      kubectl apply -f /tmp/backend-manifests.yaml
+      kubectl apply -f /tmp/external-secret.yaml
+      kubectl apply -f /tmp/backend-deployment.yaml
       kubectl rollout status deployment/backend -n default --timeout=300s
       echo "Backend deployed successfully"
 

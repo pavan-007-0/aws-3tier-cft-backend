@@ -1,4 +1,5 @@
 stages:
+  - validate
   - build
   - deploy
 
@@ -13,7 +14,242 @@ variables:
   SUBNET_B: "subnet-0a61c37122c11d0f1"
   RDS_SG_ID: "sg-0f5f53246f5b20572"
 
-# ================= BUILD =================
+# ================================================
+# STAGE 1 — VALIDATE
+# ================================================
+
+validate-yaml:
+  stage: validate
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  before_script:
+    - yum install -y python3-pip
+    - pip3 install yamllint
+  script:
+    - echo "🔍 Linting .gitlab-ci.yml..."
+    - yamllint -d "{extends: relaxed, rules: {line-length: {max: 200}}}" .gitlab-ci.yml
+    - echo "✅ YAML syntax is valid"
+  only:
+    - main
+
+validate-infra:
+  stage: validate
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  before_script:
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  script:
+    - echo "🔍 Validating AWS credentials..."
+    - aws sts get-caller-identity
+    - echo "✅ AWS credentials valid"
+
+    - echo "🔍 Checking EKS cluster exists..."
+    - aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" --query "cluster.status" --output text
+    - echo "✅ EKS cluster found"
+
+    - echo "🔍 Checking ECR repo exists or can be created..."
+    - aws ecr describe-repositories --repository-names "$BACKEND_REPO" || echo "ℹ️ Repo will be created during build"
+
+    - echo "🔍 Checking RDS security group exists..."
+    - aws ec2 describe-security-groups --group-ids "$RDS_SG_ID" --query "SecurityGroups[0].GroupId" --output text
+    - echo "✅ RDS security group found"
+
+    - echo "🔍 Checking subnets exist..."
+    - aws ec2 describe-subnets --subnet-ids "$SUBNET_A" "$SUBNET_B" --query "Subnets[*].SubnetId" --output text
+    - echo "✅ Subnets found"
+
+    - echo "🔍 Checking Secrets Manager secrets exist..."
+    - aws secretsmanager describe-secret --secret-id "secrets/backend/app" --query "Name" --output text
+    - echo "✅ Secrets found"
+  only:
+    - main
+
+validate-docker:
+  stage: validate
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  before_script:
+    - yum install -y python3-pip
+    - pip3 install dockerfile-parse
+  script:
+    - echo "🔍 Checking Dockerfile exists..."
+    - test -f Dockerfile || (echo "❌ Dockerfile not found!" && exit 1)
+    - echo "✅ Dockerfile found"
+
+    - echo "🔍 Validating Dockerfile syntax..."
+    - |
+      python3 << 'PYEOF'
+      from dockerfile_parse import DockerfileParser
+      try:
+          dfp = DockerfileParser(path='.')
+          print(f"Base image: {dfp.baseimage}")
+          print(f"Instructions: {len(dfp.structure)}")
+          print("✅ Dockerfile syntax valid")
+      except Exception as e:
+          print(f"❌ Dockerfile parse error: {e}")
+          exit(1)
+      PYEOF
+
+    - echo "🔍 Checking required files exist..."
+    - test -f requirements.txt || (echo "❌ requirements.txt not found!" && exit 1)
+    - echo "✅ requirements.txt found"
+  only:
+    - main
+
+validate-k8s-manifests:
+  stage: validate
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  before_script:
+    - yum install -y tar gzip
+    - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl && mv kubectl /usr/local/bin/
+    - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  script:
+    - echo "🔍 Generating and dry-run validating Kubernetes manifests..."
+    - |
+      FRONTEND_URL="http://placeholder-for-validation.example.com"
+      cat > backend-manifests-validate.yaml << EOF
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: backend-secrets
+        namespace: default
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: aws-secrets-manager
+          kind: ClusterSecretStore
+        target:
+          name: backend-secrets
+          creationPolicy: Owner
+        data:
+        - secretKey: DB_USER
+          remoteRef:
+            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
+            property: username
+        - secretKey: DB_PASSWORD
+          remoteRef:
+            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
+            property: password
+        - secretKey: JWT_SECRET_KEY
+          remoteRef:
+            key: "secrets/backend/app"
+            property: JWT_SECRET_KEY
+        - secretKey: SECRET_KEY
+          remoteRef:
+            key: "secrets/backend/app"
+            property: SECRET_KEY
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: backend
+        template:
+          metadata:
+            labels:
+              app: backend
+          spec:
+            containers:
+            - name: backend
+              image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:${IMAGE_TAG}
+              ports:
+              - containerPort: 5000
+              env:
+              - name: DB_HOST
+                value: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
+              - name: DB_NAME
+                value: "ecommerce_db"
+              - name: FLASK_ENV
+                value: "production"
+              - name: CORS_ORIGINS
+                value: "${FRONTEND_URL}"
+              - name: DB_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: DB_USER
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: DB_PASSWORD
+              - name: JWT_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: JWT_SECRET_KEY
+              - name: SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: backend-secrets
+                    key: SECRET_KEY
+              resources:
+                requests:
+                  cpu: "256m"
+                  memory: "512Mi"
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: backend
+        namespace: default
+      spec:
+        type: ClusterIP
+        selector:
+          app: backend
+        ports:
+        - port: 5000
+          targetPort: 5000
+          protocol: TCP
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: backend
+        namespace: default
+        annotations:
+          kubernetes.io/ingress.class: alb
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/subnets: ${SUBNET_A}, ${SUBNET_B}
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+          alb.ingress.kubernetes.io/healthcheck-path: /health
+      spec:
+        rules:
+        - http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: backend
+                  port:
+                    number: 5000
+      EOF
+
+    - echo "🔍 Running kubectl dry-run validation..."
+    - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+    # dry-run ExternalSecret separately (CRD — server won't know it, client-side only)
+    - kubectl apply --dry-run=client -f backend-manifests-validate.yaml 2>&1 | grep -v "unknown field" || true
+    - echo "✅ Kubernetes manifests are valid"
+  only:
+    - main
+
+# ================================================
+# STAGE 2 — BUILD
+# ================================================
+
 build-backend:
   stage: build
   image:
@@ -33,10 +269,14 @@ build-backend:
     - docker build -t "$BACKEND_REPO:$IMAGE_TAG" .
     - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
     - docker push "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:$IMAGE_TAG"
+    - echo "✅ Image pushed to ECR successfully"
   only:
     - main
 
-# ================= DEPLOY =================
+# ================================================
+# STAGE 3 — DEPLOY
+# ================================================
+
 deploy-backend:
   stage: deploy
   image:

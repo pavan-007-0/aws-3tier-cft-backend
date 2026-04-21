@@ -39,105 +39,69 @@ infra:
 
   script:
     - echo "Creating VPC"
-
     - |
-      VPC_ID=$(aws ec2 describe-vpcs \
-        --filters Name=tag:Name,Values=ecommerce-vpc \
-        --query "Vpcs[0].VpcId" --output text)
-
+      VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=ecommerce-vpc --query "Vpcs[0].VpcId" --output text)
       if [ "$VPC_ID" = "None" ]; then
-        VPC_ID=$(aws ec2 create-vpc \
-          --cidr-block $VPC_CIDR \
-          --query "Vpc.VpcId" --output text)
-
-        aws ec2 create-tags \
-          --resources $VPC_ID \
-          --tags Key=Name,Value=ecommerce-vpc
+        VPC_ID=$(aws ec2 create-vpc --cidr-block $VPC_CIDR --query "Vpc.VpcId" --output text)
+        aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=ecommerce-vpc
       fi
 
     - echo "Creating Internet Gateway"
-
     - |
-      IGW=$(aws ec2 create-internet-gateway \
-        --query "InternetGateway.InternetGatewayId" \
-        --output text)
-
-      aws ec2 attach-internet-gateway \
-        --internet-gateway-id $IGW \
-        --vpc-id $VPC_ID
+      IGW=$(aws ec2 create-internet-gateway --query "InternetGateway.InternetGatewayId" --output text)
+      aws ec2 attach-internet-gateway --internet-gateway-id $IGW --vpc-id $VPC_ID
 
     - echo "Creating Subnets"
-
     - |
       AZ1=$(aws ec2 describe-availability-zones --query "AvailabilityZones[0].ZoneName" --output text)
       AZ2=$(aws ec2 describe-availability-zones --query "AvailabilityZones[1].ZoneName" --output text)
 
-      SUBNET_A=$(aws ec2 create-subnet \
-        --vpc-id $VPC_ID \
-        --cidr-block $SUBNET_A_CIDR \
-        --availability-zone $AZ1 \
-        --query "Subnet.SubnetId" --output text)
-
-      SUBNET_B=$(aws ec2 create-subnet \
-        --vpc-id $VPC_ID \
-        --cidr-block $SUBNET_B_CIDR \
-        --availability-zone $AZ2 \
-        --query "Subnet.SubnetId" --output text)
+      SUBNET_A=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $SUBNET_A_CIDR --availability-zone $AZ1 --query "Subnet.SubnetId" --output text)
+      SUBNET_B=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $SUBNET_B_CIDR --availability-zone $AZ2 --query "Subnet.SubnetId" --output text)
 
       aws ec2 modify-subnet-attribute --subnet-id $SUBNET_A --map-public-ip-on-launch
       aws ec2 modify-subnet-attribute --subnet-id $SUBNET_B --map-public-ip-on-launch
 
     - echo "Creating Route Table"
-
     - |
-      RT=$(aws ec2 create-route-table \
-        --vpc-id $VPC_ID \
-        --query "RouteTable.RouteTableId" --output text)
-
-      aws ec2 create-route \
-        --route-table-id $RT \
-        --destination-cidr-block 0.0.0.0/0 \
-        --gateway-id $IGW
-
+      RT=$(aws ec2 create-route-table --vpc-id $VPC_ID --query "RouteTable.RouteTableId" --output text)
+      aws ec2 create-route --route-table-id $RT --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW
       aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_A
       aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_B
 
     - echo "Creating ECR"
-
     - |
       aws ecr describe-repositories --repository-names $BACKEND_REPO 2>/dev/null || \
       aws ecr create-repository --repository-name $BACKEND_REPO
 
-    - echo "Creating EKS Cluster"
-
+    - echo "Creating EKS config file"
     - |
-      printf "apiVersion: eksctl.io/v1alpha5\n\
-kind: ClusterConfig\n\
-metadata:\n\
-  name: ${CLUSTER_NAME}\n\
-  region: ${AWS_DEFAULT_REGION}\n\
-iam:\n\
-  withOIDC: true\n\
-vpc:\n\
-  id: ${VPC_ID}\n\
-  subnets:\n\
-    public:\n\
-      a:\n\
-        id: ${SUBNET_A}\n\
-      b:\n\
-        id: ${SUBNET_B}\n\
-  nat:\n\
-    gateway: Disable\n\
-managedNodeGroups:\n\
-  - name: nodes\n\
-    instanceType: t3.medium\n\
-    desiredCapacity: 1\n\
-    subnets:\n\
-      - ${SUBNET_A}\n\
-      - ${SUBNET_B}\n" > eks.yaml
+      echo "apiVersion: eksctl.io/v1alpha5" > eks.yaml
+      echo "kind: ClusterConfig" >> eks.yaml
+      echo "metadata:" >> eks.yaml
+      echo "  name: $CLUSTER_NAME" >> eks.yaml
+      echo "  region: $AWS_DEFAULT_REGION" >> eks.yaml
+      echo "iam:" >> eks.yaml
+      echo "  withOIDC: true" >> eks.yaml
+      echo "vpc:" >> eks.yaml
+      echo "  id: $VPC_ID" >> eks.yaml
+      echo "  subnets:" >> eks.yaml
+      echo "    public:" >> eks.yaml
+      echo "      a:" >> eks.yaml
+      echo "        id: $SUBNET_A" >> eks.yaml
+      echo "      b:" >> eks.yaml
+      echo "        id: $SUBNET_B" >> eks.yaml
+      echo "  nat:" >> eks.yaml
+      echo "    gateway: Disable" >> eks.yaml
+      echo "managedNodeGroups:" >> eks.yaml
+      echo "  - name: nodes" >> eks.yaml
+      echo "    instanceType: t3.medium" >> eks.yaml
+      echo "    desiredCapacity: 1" >> eks.yaml
+      echo "    subnets:" >> eks.yaml
+      echo "      - $SUBNET_A" >> eks.yaml
+      echo "      - $SUBNET_B" >> eks.yaml
 
     - eksctl create cluster -f eks.yaml
-
     - aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
 
 # ==========================
@@ -156,9 +120,7 @@ build:
     - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
     - docker build -t $BACKEND_REPO .
-
     - docker tag $BACKEND_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
-
     - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
 
 # ==========================
@@ -175,39 +137,39 @@ deploy:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
   script:
-    - echo "Deploying backend"
+    - echo "Creating deployment file"
 
     - |
-      printf "apiVersion: apps/v1\n\
-kind: Deployment\n\
-metadata:\n\
-  name: backend\n\
-spec:\n\
-  replicas: 1\n\
-  selector:\n\
-    matchLabels:\n\
-      app: backend\n\
-  template:\n\
-    metadata:\n\
-      labels:\n\
-        app: backend\n\
-    spec:\n\
-      containers:\n\
-      - name: backend\n\
-        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:latest\n\
-        ports:\n\
-        - containerPort: 5000\n\
----\n\
-apiVersion: v1\n\
-kind: Service\n\
-metadata:\n\
-  name: backend\n\
-spec:\n\
-  type: LoadBalancer\n\
-  selector:\n\
-    app: backend\n\
-  ports:\n\
-  - port: 80\n\
-    targetPort: 5000\n" > deploy.yaml
+      echo "apiVersion: apps/v1" > deploy.yaml
+      echo "kind: Deployment" >> deploy.yaml
+      echo "metadata:" >> deploy.yaml
+      echo "  name: backend" >> deploy.yaml
+      echo "spec:" >> deploy.yaml
+      echo "  replicas: 1" >> deploy.yaml
+      echo "  selector:" >> deploy.yaml
+      echo "    matchLabels:" >> deploy.yaml
+      echo "      app: backend" >> deploy.yaml
+      echo "  template:" >> deploy.yaml
+      echo "    metadata:" >> deploy.yaml
+      echo "      labels:" >> deploy.yaml
+      echo "        app: backend" >> deploy.yaml
+      echo "    spec:" >> deploy.yaml
+      echo "      containers:" >> deploy.yaml
+      echo "      - name: backend" >> deploy.yaml
+      echo "        image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest" >> deploy.yaml
+      echo "        ports:" >> deploy.yaml
+      echo "        - containerPort: 5000" >> deploy.yaml
+      echo "---" >> deploy.yaml
+      echo "apiVersion: v1" >> deploy.yaml
+      echo "kind: Service" >> deploy.yaml
+      echo "metadata:" >> deploy.yaml
+      echo "  name: backend" >> deploy.yaml
+      echo "spec:" >> deploy.yaml
+      echo "  type: LoadBalancer" >> deploy.yaml
+      echo "  selector:" >> deploy.yaml
+      echo "    app: backend" >> deploy.yaml
+      echo "  ports:" >> deploy.yaml
+      echo "  - port: 80" >> deploy.yaml
+      echo "    targetPort: 5000" >> deploy.yaml
 
     - kubectl apply -f deploy.yaml

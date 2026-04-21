@@ -1,9 +1,6 @@
-image:
-  name: amazon/aws-cli
-  entrypoint: [""]
-
-services:
-  - docker:24-dind
+stages:
+  - build
+  - deploy
 
 variables:
   DOCKER_TLS_CERTDIR: ""
@@ -15,10 +12,6 @@ variables:
   SUBNET_A: "subnet-0951f168b0769217c"
   SUBNET_B: "subnet-0a61c37122c11d0f1"
   RDS_SG_ID: "sg-0f5f53246f5b20572"
-
-stages:
-  - build
-  - deploy
 
 # ================= BUILD =================
 build-backend:
@@ -51,7 +44,7 @@ deploy-backend:
     entrypoint: [""]
   needs: ["build-backend"]
   before_script:
-    - yum install -y curl tar gzip gettext jq
+    - yum install -y tar gzip gettext jq
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     - curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl && mv kubectl /usr/local/bin/
@@ -222,7 +215,7 @@ deploy-backend:
       kubectl rollout status deployment/backend -n default --timeout=300s
       echo "✅ Backend successfully deployed to EKS!"
 
-    # 4. Get the new ALB URL
+    # 4. Wait for ALB URL
     - |
       echo "⏳ Waiting for ALB Load Balancer to provision..."
       for i in {1..120}; do

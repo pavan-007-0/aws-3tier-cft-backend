@@ -422,7 +422,7 @@ infra-eks:
           "    minSize: ${NODE_MIN}" \
           "    maxSize: ${NODE_MAX}" \
           "    desiredCapacity: ${NODE_DESIRED}" \
-          "    amiFamily: AmazonLinux2" \
+          "    amiFamily: AmazonLinux2023" \
           "    subnets:" \
           "      - ${SUBNET_A}" \
           "      - ${SUBNET_B}" \
@@ -521,7 +521,7 @@ infra-eks:
         --set serviceAccount.name=aws-load-balancer-controller \
         --set region="$AWS_DEFAULT_REGION" \
         --set vpcId="$VPC_ID" \
-        --wait || true
+        --wait
       echo "ALB controller installed"
 
     - echo "Installing External Secrets Operator..."
@@ -531,8 +531,33 @@ infra-eks:
       helm upgrade --install external-secrets external-secrets/external-secrets \
         --namespace external-secrets \
         --create-namespace \
-        --wait || true
+        --wait
       echo "External Secrets Operator installed"
+
+      # Wait for ESO CRDs to be fully registered in the Kubernetes API server
+      # Helm --wait only ensures pods are ready, not that CRDs are fully discoverable
+      echo "Waiting for External Secrets CRDs to be registered..."
+      for i in $(seq 1 30); do
+        if kubectl get crd clustersecretstores.external-secrets.io >/dev/null 2>&1; then
+          echo "CRD clustersecretstores.external-secrets.io is ready (attempt $i)"
+          break
+        fi
+        if [ "$i" = "30" ]; then
+          echo "ERROR: CRD clustersecretstores.external-secrets.io never became available"
+          exit 1
+        fi
+        echo "Attempt $i/30 - CRD not ready yet, waiting 10s..."
+        sleep 10
+      done
+
+      # Also wait for ESO controller and webhook deployments to be fully rolled out
+      echo "Waiting for ESO controller deployment..."
+      kubectl rollout status deployment/external-secrets \
+        -n external-secrets --timeout=120s
+      echo "Waiting for ESO webhook deployment..."
+      kubectl rollout status deployment/external-secrets-webhook \
+        -n external-secrets --timeout=120s
+      echo "ESO fully ready"
 
     - echo "Creating ExternalSecrets IAM policy and service account..."
     - |

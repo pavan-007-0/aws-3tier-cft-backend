@@ -38,7 +38,7 @@ infra:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
   script:
-    - echo "Creating VPC..."
+    - echo "Creating VPC"
 
     - |
       VPC_ID=$(aws ec2 describe-vpcs \
@@ -55,7 +55,7 @@ infra:
           --tags Key=Name,Value=ecommerce-vpc
       fi
 
-    - echo "Creating Internet Gateway..."
+    - echo "Creating Internet Gateway"
 
     - |
       IGW=$(aws ec2 create-internet-gateway \
@@ -66,14 +66,11 @@ infra:
         --internet-gateway-id $IGW \
         --vpc-id $VPC_ID
 
-    - echo "Creating Subnets..."
+    - echo "Creating Subnets"
 
     - |
-      AZ1=$(aws ec2 describe-availability-zones \
-        --query "AvailabilityZones[0].ZoneName" --output text)
-
-      AZ2=$(aws ec2 describe-availability-zones \
-        --query "AvailabilityZones[1].ZoneName" --output text)
+      AZ1=$(aws ec2 describe-availability-zones --query "AvailabilityZones[0].ZoneName" --output text)
+      AZ2=$(aws ec2 describe-availability-zones --query "AvailabilityZones[1].ZoneName" --output text)
 
       SUBNET_A=$(aws ec2 create-subnet \
         --vpc-id $VPC_ID \
@@ -87,15 +84,10 @@ infra:
         --availability-zone $AZ2 \
         --query "Subnet.SubnetId" --output text)
 
-      aws ec2 modify-subnet-attribute \
-        --subnet-id $SUBNET_A \
-        --map-public-ip-on-launch
+      aws ec2 modify-subnet-attribute --subnet-id $SUBNET_A --map-public-ip-on-launch
+      aws ec2 modify-subnet-attribute --subnet-id $SUBNET_B --map-public-ip-on-launch
 
-      aws ec2 modify-subnet-attribute \
-        --subnet-id $SUBNET_B \
-        --map-public-ip-on-launch
-
-    - echo "Creating Route Table..."
+    - echo "Creating Route Table"
 
     - |
       RT=$(aws ec2 create-route-table \
@@ -107,57 +99,46 @@ infra:
         --destination-cidr-block 0.0.0.0/0 \
         --gateway-id $IGW
 
-      aws ec2 associate-route-table \
-        --route-table-id $RT \
-        --subnet-id $SUBNET_A
+      aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_A
+      aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_B
 
-      aws ec2 associate-route-table \
-        --route-table-id $RT \
-        --subnet-id $SUBNET_B
-
-    - echo "Creating ECR..."
+    - echo "Creating ECR"
 
     - |
-      aws ecr describe-repositories \
-        --repository-names $BACKEND_REPO 2>/dev/null || \
-      aws ecr create-repository \
-        --repository-name $BACKEND_REPO
+      aws ecr describe-repositories --repository-names $BACKEND_REPO 2>/dev/null || \
+      aws ecr create-repository --repository-name $BACKEND_REPO
 
-    - echo "Creating EKS Cluster..."
+    - echo "Creating EKS Cluster"
 
     - |
-      cat <<EOF > eks.yaml
-apiVersion: eksctl.io/v1alpha5
-kind: ClusterConfig
-metadata:
-  name: ${CLUSTER_NAME}
-  region: ${AWS_DEFAULT_REGION}
-iam:
-  withOIDC: true
-vpc:
-  id: ${VPC_ID}
-  subnets:
-    public:
-      a:
-        id: ${SUBNET_A}
-      b:
-        id: ${SUBNET_B}
-  nat:
-    gateway: Disable
-managedNodeGroups:
-  - name: nodes
-    instanceType: t3.medium
-    desiredCapacity: 1
-    subnets:
-      - ${SUBNET_A}
-      - ${SUBNET_B}
-EOF
+      printf "apiVersion: eksctl.io/v1alpha5\n\
+kind: ClusterConfig\n\
+metadata:\n\
+  name: ${CLUSTER_NAME}\n\
+  region: ${AWS_DEFAULT_REGION}\n\
+iam:\n\
+  withOIDC: true\n\
+vpc:\n\
+  id: ${VPC_ID}\n\
+  subnets:\n\
+    public:\n\
+      a:\n\
+        id: ${SUBNET_A}\n\
+      b:\n\
+        id: ${SUBNET_B}\n\
+  nat:\n\
+    gateway: Disable\n\
+managedNodeGroups:\n\
+  - name: nodes\n\
+    instanceType: t3.medium\n\
+    desiredCapacity: 1\n\
+    subnets:\n\
+      - ${SUBNET_A}\n\
+      - ${SUBNET_B}\n" > eks.yaml
 
     - eksctl create cluster -f eks.yaml
 
-    - aws eks update-kubeconfig \
-        --name $CLUSTER_NAME \
-        --region $AWS_DEFAULT_REGION
+    - aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
 
 # ==========================
 # BUILD
@@ -172,18 +153,13 @@ build:
     - pip install awscli
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-    - aws ecr get-login-password \
-      --region $AWS_DEFAULT_REGION | docker login \
-      --username AWS \
-      --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
     - docker build -t $BACKEND_REPO .
 
-    - docker tag $BACKEND_REPO:latest \
-      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
+    - docker tag $BACKEND_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
 
-    - docker push \
-      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
+    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
 
 # ==========================
 # DEPLOY
@@ -199,41 +175,39 @@ deploy:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
   script:
-    - echo "Deploying backend..."
+    - echo "Deploying backend"
 
     - |
-      cat <<EOF > deploy.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backend
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: backend
-  template:
-    metadata:
-      labels:
-        app: backend
-    spec:
-      containers:
-      - name: backend
-        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:latest
-        ports:
-        - containerPort: 5000
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-spec:
-  type: LoadBalancer
-  selector:
-    app: backend
-  ports:
-  - port: 80
-    targetPort: 5000
-EOF
+      printf "apiVersion: apps/v1\n\
+kind: Deployment\n\
+metadata:\n\
+  name: backend\n\
+spec:\n\
+  replicas: 1\n\
+  selector:\n\
+    matchLabels:\n\
+      app: backend\n\
+  template:\n\
+    metadata:\n\
+      labels:\n\
+        app: backend\n\
+    spec:\n\
+      containers:\n\
+      - name: backend\n\
+        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${BACKEND_REPO}:latest\n\
+        ports:\n\
+        - containerPort: 5000\n\
+---\n\
+apiVersion: v1\n\
+kind: Service\n\
+metadata:\n\
+  name: backend\n\
+spec:\n\
+  type: LoadBalancer\n\
+  selector:\n\
+    app: backend\n\
+  ports:\n\
+  - port: 80\n\
+    targetPort: 5000\n" > deploy.yaml
 
     - kubectl apply -f deploy.yaml

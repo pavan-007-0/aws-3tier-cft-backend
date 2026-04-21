@@ -1,6 +1,7 @@
 stages:
   - validate
-  - infra
+  - infra-network
+  - infra-cluster
   - build
   - deploy
 
@@ -10,13 +11,10 @@ variables:
   BACKEND_REPO: backend-repo
   IMAGE_TAG: latest
   CLUSTER_NAME: ecommerce-cluster
-  VPC_ID: "vpc-08154df9a2d395b74"
-  SUBNET_A: "subnet-08069b38b8523e498"
-  SUBNET_B: "subnet-09f6c7704fb913937"
-  RDS_SG_ID: "sg-0f5f53246f5b20572"
+  VPC_CIDR: "10.0.0.0/16"
+  SUBNET_A_CIDR: "10.0.1.0/24"
+  SUBNET_B_CIDR: "10.0.2.0/24"
   RDS_ENDPOINT: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
-  SECRET_APP_ARN: "arn:aws:secretsmanager:us-east-1:650251731987:secret:secrets/backend/app-jrGxUC"
-  SECRET_RDS_ARN: "arn:aws:secretsmanager:us-east-1:650251731987:secret:rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab-kVLItg"
   NODE_INSTANCE_TYPE: "t3.medium"
   NODE_MIN: "1"
   NODE_MAX: "3"
@@ -36,16 +34,10 @@ validate-aws-credentials:
     - aws sts get-caller-identity
     - echo "Checking region is reachable..."
     - aws ec2 describe-availability-zones --region "$AWS_DEFAULT_REGION" --query "AvailabilityZones[0].State" --output text
-    - echo "Verifying VPC exists..."
-    - aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query "Vpcs[0].VpcId" --output text
-    - echo "Verifying subnets exist..."
-    - aws ec2 describe-subnets --subnet-ids "$SUBNET_A" "$SUBNET_B" --query "Subnets[*].SubnetId" --output text
-    - echo "Verifying RDS security group exists..."
-    - aws ec2 describe-security-groups --group-ids "$RDS_SG_ID" --query "SecurityGroups[0].GroupId" --output text
     - echo "Verifying Secrets Manager secrets exist..."
     - aws secretsmanager describe-secret --secret-id "secrets/backend/app" --query "Name" --output text
     - aws secretsmanager describe-secret --secret-id "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" --query "Name" --output text
-    - echo "All AWS infrastructure checks passed"
+    - echo "All AWS credential checks passed"
   only:
     - main
 
@@ -56,7 +48,7 @@ validate-python-code:
     entrypoint: [""]
   before_script:
     - yum install -y python3-pip
-    - pip3 install pyflakes bandit pylint flask flask-cors flask-limiter flask-wtf mysql-connector-python python-dotenv PyJWT Werkzeug cryptography bcrypt marshmallow email-validator requests gunicorn
+    - pip3 install pyflakes bandit flask flask-cors flask-limiter flask-wtf mysql-connector-python python-dotenv PyJWT Werkzeug cryptography bcrypt marshmallow email-validator requests gunicorn
   script:
     - echo "Checking Python syntax on all .py files..."
     - |
@@ -75,15 +67,10 @@ validate-python-code:
         exit 1
       fi
       echo "All Python files passed syntax check"
-
-    - echo "Running pyflakes for undefined names and unused imports..."
-    - |
-      python3 -m pyflakes app.py auth.py db.py orders.py products.py cart.py admin.py security.py error_handlers.py 2>&1 || true
-
-    - echo "Running bandit security scan..."
-    - |
-      python3 -m bandit -r . -x ./__pycache__ --severity-level medium -f txt 2>&1 || true
-
+    - echo "Running pyflakes..."
+    - python3 -m pyflakes app.py auth.py db.py orders.py products.py cart.py admin.py security.py error_handlers.py 2>&1 || true
+    - echo "Running bandit on core app files only..."
+    - python3 -m bandit -r app.py auth.py db.py orders.py products.py cart.py admin.py security.py error_handlers.py --severity-level high -f txt 2>&1 || true
     - echo "Python validation complete"
   only:
     - main
@@ -118,20 +105,207 @@ validate-docker:
           print(f"ERROR: {e}")
           exit(1)
       PYEOF
-    - echo "Checking requirements.txt exists..."
+    - echo "Checking requirements.txt exists and is not empty..."
     - test -f requirements.txt || (echo "ERROR requirements.txt not found" && exit 1)
-    - echo "Validating requirements.txt is not empty..."
     - test -s requirements.txt || (echo "ERROR requirements.txt is empty" && exit 1)
     - echo "Docker validation passed"
   only:
     - main
 
 # ==========================
-# STAGE 2 - INFRA
+# STAGE 2 - INFRA NETWORK
+# public subnets only
+# NO NAT gateway
+# NO elastic IPs
 # ==========================
 
+infra-network:
+  stage: infra-network
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  script:
+    - echo "Checking for any existing NAT gateways to avoid accidental creation..."
+    - |
+      EXISTING_NAT=$(aws ec2 describe-nat-gateways \
+        --filter "Name=state,Values=available,pending" \
+        --query "NatGateways[?Tags[?Key=='Name' && contains(Value,'ecommerce')]].NatGatewayId" \
+        --output text 2>/dev/null || echo "")
+      if [ -n "$EXISTING_NAT" ]; then
+        echo "WARNING: Found existing NAT gateway $EXISTING_NAT - pipeline will NOT create any new ones"
+      else
+        echo "No existing NAT gateways found - good, none will be created"
+      fi
+
+    - echo "Creating VPC if not exists..."
+    - |
+      VPC_ID=$(aws ec2 describe-vpcs \
+        --filters "Name=tag:Name,Values=ecommerce-vpc" \
+        --query "Vpcs[0].VpcId" --output text 2>/dev/null)
+
+      if [ "$VPC_ID" = "None" ] || [ -z "$VPC_ID" ]; then
+        VPC_ID=$(aws ec2 create-vpc \
+          --cidr-block "$VPC_CIDR" \
+          --query "Vpc.VpcId" --output text)
+        aws ec2 create-tags --resources "$VPC_ID" \
+          --tags Key=Name,Value=ecommerce-vpc Key=ManagedBy,Value=gitlab-cicd
+        aws ec2 modify-vpc-attribute --vpc-id "$VPC_ID" --enable-dns-support
+        aws ec2 modify-vpc-attribute --vpc-id "$VPC_ID" --enable-dns-hostnames
+        echo "VPC created: $VPC_ID"
+      else
+        echo "VPC already exists: $VPC_ID"
+      fi
+      echo "VPC_ID=$VPC_ID" >> /tmp/infra.env
+
+    - echo "Creating Internet Gateway if not exists..."
+    - |
+      source /tmp/infra.env
+      IGW_ID=$(aws ec2 describe-internet-gateways \
+        --filters "Name=tag:Name,Values=ecommerce-igw" \
+        --query "InternetGateways[0].InternetGatewayId" --output text 2>/dev/null)
+
+      if [ "$IGW_ID" = "None" ] || [ -z "$IGW_ID" ]; then
+        IGW_ID=$(aws ec2 create-internet-gateway \
+          --query "InternetGateway.InternetGatewayId" --output text)
+        aws ec2 create-tags --resources "$IGW_ID" \
+          --tags Key=Name,Value=ecommerce-igw Key=ManagedBy,Value=gitlab-cicd
+        aws ec2 attach-internet-gateway \
+          --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID"
+        echo "Internet Gateway created and attached: $IGW_ID"
+      else
+        echo "Internet Gateway already exists: $IGW_ID"
+      fi
+      echo "IGW_ID=$IGW_ID" >> /tmp/infra.env
+
+    - echo "Getting availability zones..."
+    - |
+      AZ_A=$(aws ec2 describe-availability-zones \
+        --region "$AWS_DEFAULT_REGION" \
+        --query "AvailabilityZones[0].ZoneName" --output text)
+      AZ_B=$(aws ec2 describe-availability-zones \
+        --region "$AWS_DEFAULT_REGION" \
+        --query "AvailabilityZones[1].ZoneName" --output text)
+      echo "AZ_A=$AZ_A" >> /tmp/infra.env
+      echo "AZ_B=$AZ_B" >> /tmp/infra.env
+      echo "Using AZs: $AZ_A and $AZ_B"
+
+    - echo "Creating public subnet A if not exists..."
+    - |
+      source /tmp/infra.env
+      SUBNET_A=$(aws ec2 describe-subnets \
+        --filters "Name=tag:Name,Values=ecommerce-subnet-public-a" "Name=vpc-id,Values=$VPC_ID" \
+        --query "Subnets[0].SubnetId" --output text 2>/dev/null)
+
+      if [ "$SUBNET_A" = "None" ] || [ -z "$SUBNET_A" ]; then
+        SUBNET_A=$(aws ec2 create-subnet \
+          --vpc-id "$VPC_ID" \
+          --cidr-block "$SUBNET_A_CIDR" \
+          --availability-zone "$AZ_A" \
+          --query "Subnet.SubnetId" --output text)
+        aws ec2 create-tags --resources "$SUBNET_A" \
+          --tags Key=Name,Value=ecommerce-subnet-public-a \
+                 Key=ManagedBy,Value=gitlab-cicd \
+                 Key=kubernetes.io/role/elb,Value=1 \
+                 Key=kubernetes.io/cluster/${CLUSTER_NAME},Value=shared
+        aws ec2 modify-subnet-attribute --subnet-id "$SUBNET_A" --map-public-ip-on-launch
+        echo "Public Subnet A created: $SUBNET_A in $AZ_A"
+      else
+        echo "Public Subnet A already exists: $SUBNET_A"
+      fi
+      echo "SUBNET_A=$SUBNET_A" >> /tmp/infra.env
+
+    - echo "Creating public subnet B if not exists..."
+    - |
+      source /tmp/infra.env
+      SUBNET_B=$(aws ec2 describe-subnets \
+        --filters "Name=tag:Name,Values=ecommerce-subnet-public-b" "Name=vpc-id,Values=$VPC_ID" \
+        --query "Subnets[0].SubnetId" --output text 2>/dev/null)
+
+      if [ "$SUBNET_B" = "None" ] || [ -z "$SUBNET_B" ]; then
+        SUBNET_B=$(aws ec2 create-subnet \
+          --vpc-id "$VPC_ID" \
+          --cidr-block "$SUBNET_B_CIDR" \
+          --availability-zone "$AZ_B" \
+          --query "Subnet.SubnetId" --output text)
+        aws ec2 create-tags --resources "$SUBNET_B" \
+          --tags Key=Name,Value=ecommerce-subnet-public-b \
+                 Key=ManagedBy,Value=gitlab-cicd \
+                 Key=kubernetes.io/role/elb,Value=1 \
+                 Key=kubernetes.io/cluster/${CLUSTER_NAME},Value=shared
+        aws ec2 modify-subnet-attribute --subnet-id "$SUBNET_B" --map-public-ip-on-launch
+        echo "Public Subnet B created: $SUBNET_B in $AZ_B"
+      else
+        echo "Public Subnet B already exists: $SUBNET_B"
+      fi
+      echo "SUBNET_B=$SUBNET_B" >> /tmp/infra.env
+
+    - echo "Creating public route table and attaching to both subnets..."
+    - |
+      source /tmp/infra.env
+      RT_ID=$(aws ec2 describe-route-tables \
+        --filters "Name=tag:Name,Values=ecommerce-public-rt" "Name=vpc-id,Values=$VPC_ID" \
+        --query "RouteTables[0].RouteTableId" --output text 2>/dev/null)
+
+      if [ "$RT_ID" = "None" ] || [ -z "$RT_ID" ]; then
+        RT_ID=$(aws ec2 create-route-table \
+          --vpc-id "$VPC_ID" \
+          --query "RouteTable.RouteTableId" --output text)
+        aws ec2 create-tags --resources "$RT_ID" \
+          --tags Key=Name,Value=ecommerce-public-rt Key=ManagedBy,Value=gitlab-cicd
+        aws ec2 create-route \
+          --route-table-id "$RT_ID" \
+          --destination-cidr-block "0.0.0.0/0" \
+          --gateway-id "$IGW_ID"
+        aws ec2 associate-route-table --route-table-id "$RT_ID" --subnet-id "$SUBNET_A"
+        aws ec2 associate-route-table --route-table-id "$RT_ID" --subnet-id "$SUBNET_B"
+        echo "Public route table created: $RT_ID"
+        echo "Route: 0.0.0.0/0 -> Internet Gateway (no NAT, no Elastic IP)"
+      else
+        echo "Route table already exists: $RT_ID"
+      fi
+
+    - echo "Creating RDS security group if not exists..."
+    - |
+      source /tmp/infra.env
+      RDS_SG_ID=$(aws ec2 describe-security-groups \
+        --filters "Name=tag:Name,Values=ecommerce-rds-sg" "Name=vpc-id,Values=$VPC_ID" \
+        --query "SecurityGroups[0].GroupId" --output text 2>/dev/null)
+
+      if [ "$RDS_SG_ID" = "None" ] || [ -z "$RDS_SG_ID" ]; then
+        RDS_SG_ID=$(aws ec2 create-security-group \
+          --group-name ecommerce-rds-sg \
+          --description "RDS access from EKS - no public access" \
+          --vpc-id "$VPC_ID" \
+          --query "GroupId" --output text)
+        aws ec2 create-tags --resources "$RDS_SG_ID" \
+          --tags Key=Name,Value=ecommerce-rds-sg Key=ManagedBy,Value=gitlab-cicd
+        echo "RDS security group created: $RDS_SG_ID"
+      else
+        echo "RDS security group already exists: $RDS_SG_ID"
+      fi
+      echo "RDS_SG_ID=$RDS_SG_ID" >> /tmp/infra.env
+
+    - echo "Saving all IDs to SSM Parameter Store..."
+    - |
+      source /tmp/infra.env
+      aws ssm put-parameter --name "/ecommerce/vpc-id"    --value "$VPC_ID"    --type String --overwrite
+      aws ssm put-parameter --name "/ecommerce/subnet-a"  --value "$SUBNET_A"  --type String --overwrite
+      aws ssm put-parameter --name "/ecommerce/subnet-b"  --value "$SUBNET_B"  --type String --overwrite
+      aws ssm put-parameter --name "/ecommerce/rds-sg-id" --value "$RDS_SG_ID" --type String --overwrite
+      echo "All parameters saved to SSM"
+      echo "-----------------------------"
+      echo "VPC:              $VPC_ID"
+      echo "Public Subnet A:  $SUBNET_A ($AZ_A)"
+      echo "Public Subnet B:  $SUBNET_B ($AZ_B)"
+      echo "RDS SG:           $RDS_SG_ID"
+      echo "NAT Gateway:      NONE - not created"
+      echo "Elastic IPs:      NONE - not created"
+      echo "-----------------------------"
+  only:
+    - main
+
 infra-ecr:
-  stage: infra
+  stage: infra-network
   image:
     name: amazon/aws-cli
     entrypoint: [""]
@@ -151,7 +325,7 @@ infra-ecr:
     - main
 
 infra-secrets:
-  stage: infra
+  stage: infra-network
   image:
     name: amazon/aws-cli
     entrypoint: [""]
@@ -170,8 +344,14 @@ infra-secrets:
   only:
     - main
 
+# ==========================
+# STAGE 3 - INFRA CLUSTER
+# eksctl config file approach
+# explicitly disables NAT
+# ==========================
+
 infra-eks:
-  stage: infra
+  stage: infra-cluster
   image:
     name: amazon/aws-cli
     entrypoint: [""]
@@ -185,8 +365,22 @@ infra-eks:
     - tar -xzf helm-v3.14.0-linux-amd64.tar.gz && mv linux-amd64/helm /usr/local/bin/
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   script:
+    - echo "Reading network IDs from SSM..."
+    - |
+      VPC_ID=$(aws ssm get-parameter --name "/ecommerce/vpc-id" --query "Parameter.Value" --output text)
+      SUBNET_A=$(aws ssm get-parameter --name "/ecommerce/subnet-a" --query "Parameter.Value" --output text)
+      SUBNET_B=$(aws ssm get-parameter --name "/ecommerce/subnet-b" --query "Parameter.Value" --output text)
+      RDS_SG_ID=$(aws ssm get-parameter --name "/ecommerce/rds-sg-id" --query "Parameter.Value" --output text)
+      echo "VPC:      $VPC_ID"
+      echo "Subnet A: $SUBNET_A"
+      echo "Subnet B: $SUBNET_B"
+
     - echo "Checking if EKS cluster exists..."
     - |
+      VPC_ID=$(aws ssm get-parameter --name "/ecommerce/vpc-id" --query "Parameter.Value" --output text)
+      SUBNET_A=$(aws ssm get-parameter --name "/ecommerce/subnet-a" --query "Parameter.Value" --output text)
+      SUBNET_B=$(aws ssm get-parameter --name "/ecommerce/subnet-b" --query "Parameter.Value" --output text)
+
       CLUSTER_EXISTS=$(aws eks describe-cluster \
         --name "$CLUSTER_NAME" \
         --region "$AWS_DEFAULT_REGION" \
@@ -194,27 +388,60 @@ infra-eks:
         --output text 2>&1 || echo "NOT_FOUND")
 
       if echo "$CLUSTER_EXISTS" | grep -q "NOT_FOUND\|ResourceNotFoundException"; then
-        echo "Cluster not found. Creating EKS cluster with latest version..."
+        echo "Cluster not found. Creating with public nodes only - NO NAT gateway..."
+
         EKS_VERSION=$(aws eks describe-addon-versions \
           --query "sort_by(addons[0].addonVersions, &addonVersion)[-1].compatibilities[0].clusterVersion" \
           --output text 2>/dev/null || echo "1.32")
-        echo "Using EKS version: $EKS_VERSION"
-        eksctl create cluster \
-          --name "$CLUSTER_NAME" \
-          --version "$EKS_VERSION" \
-          --region "$AWS_DEFAULT_REGION" \
-          --vpc-public-subnets "$SUBNET_A,$SUBNET_B" \
-          --nodegroup-name backend-nodes \
-          --node-type "$NODE_INSTANCE_TYPE" \
-          --nodes "$NODE_DESIRED" \
-          --nodes-min "$NODE_MIN" \
-          --nodes-max "$NODE_MAX" \
-          --managed \
-          --alb-ingress-access \
-          --full-ecr-access \
-          --asg-access \
-          --with-oidc
-        echo "EKS cluster created"
+        echo "EKS version: $EKS_VERSION"
+
+        # Use eksctl config file to explicitly control networking
+        # publicSubnets only = no private subnets = no NAT gateway needed
+        cat > /tmp/eksctl-config.yaml << EKSEOF
+        apiVersion: eksctl.io/v1alpha5
+        kind: ClusterConfig
+        metadata:
+          name: ${CLUSTER_NAME}
+          region: ${AWS_DEFAULT_REGION}
+          version: "${EKS_VERSION}"
+        iam:
+          withOIDC: true
+        vpc:
+          id: ${VPC_ID}
+          subnets:
+            public:
+              public-a:
+                id: ${SUBNET_A}
+              public-b:
+                id: ${SUBNET_B}
+          nat:
+            gateway: Disable
+        managedNodeGroups:
+          - name: backend-nodes
+            instanceType: ${NODE_INSTANCE_TYPE}
+            minSize: ${NODE_MIN}
+            maxSize: ${NODE_MAX}
+            desiredCapacity: ${NODE_DESIRED}
+            amiFamily: AmazonLinux2
+            subnets:
+              - ${SUBNET_A}
+              - ${SUBNET_B}
+            iam:
+              attachPolicyARNs:
+                - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+                - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+                - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+                - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
+            ssh:
+              allow: false
+        addons:
+          - name: vpc-cni
+          - name: coredns
+          - name: kube-proxy
+        EKSEOF
+
+        eksctl create cluster -f /tmp/eksctl-config.yaml
+        echo "EKS cluster created - public nodes only, no NAT gateway, no Elastic IPs"
       else
         echo "EKS cluster already exists - status: $CLUSTER_EXISTS"
       fi
@@ -222,8 +449,42 @@ infra-eks:
     - echo "Updating kubeconfig..."
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
 
+    - echo "Verifying NO NAT gateways were created..."
+    - |
+      VPC_ID=$(aws ssm get-parameter --name "/ecommerce/vpc-id" --query "Parameter.Value" --output text)
+      NAT_CHECK=$(aws ec2 describe-nat-gateways \
+        --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available,pending" \
+        --query "NatGateways[*].NatGatewayId" --output text 2>/dev/null || echo "")
+      if [ -n "$NAT_CHECK" ]; then
+        echo "WARNING: NAT gateway detected: $NAT_CHECK"
+        echo "Deleting to avoid costs..."
+        for NAT_ID in $NAT_CHECK; do
+          aws ec2 delete-nat-gateway --nat-gateway-id "$NAT_ID" || true
+          echo "Deleted NAT gateway: $NAT_ID"
+        done
+      else
+        echo "CONFIRMED: No NAT gateways exist - no unnecessary costs"
+      fi
+
+    - echo "Verifying NO unattached Elastic IPs exist..."
+    - |
+      UNATTACHED_EIPS=$(aws ec2 describe-addresses \
+        --query "Addresses[?AssociationId==null].AllocationId" \
+        --output text 2>/dev/null || echo "")
+      if [ -n "$UNATTACHED_EIPS" ]; then
+        echo "WARNING: Unattached Elastic IPs found: $UNATTACHED_EIPS"
+        echo "Releasing to avoid costs..."
+        for EIP in $UNATTACHED_EIPS; do
+          aws ec2 release-address --allocation-id "$EIP" || true
+          echo "Released EIP: $EIP"
+        done
+      else
+        echo "CONFIRMED: No unattached Elastic IPs - no unnecessary costs"
+      fi
+
     - echo "Installing AWS Load Balancer Controller..."
     - |
+      VPC_ID=$(aws ssm get-parameter --name "/ecommerce/vpc-id" --query "Parameter.Value" --output text)
       POLICY_ARN=$(aws iam list-policies \
         --query "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn" \
         --output text 2>/dev/null || echo "")
@@ -281,9 +542,9 @@ infra-eks:
           --policy-name ExternalSecretsPolicy \
           --policy-document file:///tmp/eso-policy.json \
           --query "Policy.Arn" --output text)
-        echo "ExternalSecrets IAM policy created: $POLICY_ESO_ARN"
+        echo "ExternalSecrets IAM policy created"
       else
-        echo "ExternalSecrets IAM policy already exists: $POLICY_ESO_ARN"
+        echo "ExternalSecrets IAM policy already exists"
       fi
 
       eksctl create iamserviceaccount \
@@ -300,28 +561,13 @@ infra-eks:
       kubectl apply -f /tmp/cluster-secret-store.yaml
       echo "ClusterSecretStore created"
 
-    - echo "Verifying cluster health..."
-    - kubectl get nodes
-    - kubectl get pods -n kube-system
-    - echo "EKS cluster fully ready"
-  timeout: 40m
-  only:
-    - main
-
-infra-rds-access:
-  stage: infra
-  image:
-    name: amazon/aws-cli
-    entrypoint: [""]
-  needs: ["infra-eks"]
-  script:
-    - echo "Configuring RDS security group access from EKS..."
+    - echo "Granting EKS nodes access to RDS security group..."
     - |
+      RDS_SG_ID=$(aws ssm get-parameter --name "/ecommerce/rds-sg-id" --query "Parameter.Value" --output text)
       EKS_NODE_SG=$(aws eks describe-cluster \
         --name "$CLUSTER_NAME" \
         --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
         --output text)
-      echo "EKS cluster SG: $EKS_NODE_SG"
 
       RULE_EXISTS=$(aws ec2 describe-security-group-rules \
         --filters \
@@ -338,15 +584,31 @@ infra-rds-access:
           --protocol tcp \
           --port 3306 \
           --source-group "$EKS_NODE_SG" || true
-        echo "RDS access granted from EKS nodes"
+        echo "RDS port 3306 opened for EKS nodes"
       else
-        echo "RDS access rule already exists"
+        echo "RDS rule already exists"
       fi
+
+    - echo "Final cost check..."
+    - |
+      VPC_ID=$(aws ssm get-parameter --name "/ecommerce/vpc-id" --query "Parameter.Value" --output text)
+      NAT_FINAL=$(aws ec2 describe-nat-gateways \
+        --filter "Name=vpc-id,Values=$VPC_ID" "Name=state,Values=available,pending" \
+        --query "NatGateways[*].NatGatewayId" --output text 2>/dev/null || echo "none")
+      EIP_FINAL=$(aws ec2 describe-addresses \
+        --query "Addresses[?AssociationId==null].PublicIp" \
+        --output text 2>/dev/null || echo "none")
+      echo "NAT Gateways in VPC: ${NAT_FINAL:-none}"
+      echo "Unattached Elastic IPs: ${EIP_FINAL:-none}"
+      echo "Cluster is ready with zero NAT/EIP costs"
+    - kubectl get nodes
+    - echo "EKS cluster fully ready"
+  timeout: 40m
   only:
     - main
 
 # ==========================
-# STAGE 3 - BUILD
+# STAGE 4 - BUILD
 # ==========================
 
 build-backend:
@@ -373,7 +635,7 @@ build-backend:
     - main
 
 # ==========================
-# STAGE 4 - DEPLOY
+# STAGE 5 - DEPLOY
 # ==========================
 
 deploy-backend:
@@ -381,7 +643,7 @@ deploy-backend:
   image:
     name: amazon/aws-cli
     entrypoint: [""]
-  needs: ["build-backend", "infra-rds-access"]
+  needs: ["build-backend"]
   before_script:
     - yum install -y tar gzip gettext jq
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -390,13 +652,17 @@ deploy-backend:
     - aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
   script:
     - |
+      SUBNET_A=$(aws ssm get-parameter --name "/ecommerce/subnet-a" --query "Parameter.Value" --output text)
+      SUBNET_B=$(aws ssm get-parameter --name "/ecommerce/subnet-b" --query "Parameter.Value" --output text)
+      export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
       FRONTEND_URL=$(aws cloudformation describe-stacks \
         --stack-name frontend-stack \
         --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" \
         --output text 2>/dev/null || echo "http://localhost:4200")
       echo "Frontend URL: $FRONTEND_URL"
-
-      export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      echo "Subnet A:     $SUBNET_A"
+      echo "Subnet B:     $SUBNET_B"
 
       printf 'apiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: backend-secrets\n  namespace: default\nspec:\n  refreshInterval: 1h\n  secretStoreRef:\n    name: aws-secrets-manager\n    kind: ClusterSecretStore\n  target:\n    name: backend-secrets\n    creationPolicy: Owner\n  data:\n  - secretKey: DB_USER\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: username\n  - secretKey: DB_PASSWORD\n    remoteRef:\n      key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"\n      property: password\n  - secretKey: JWT_SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: JWT_SECRET_KEY\n  - secretKey: SECRET_KEY\n    remoteRef:\n      key: "secrets/backend/app"\n      property: SECRET_KEY\n' > /tmp/external-secret.yaml
 

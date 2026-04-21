@@ -87,19 +87,19 @@ deploy-backend:
         data:
         - secretKey: DB_USER
           remoteRef:
-            key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
             property: username
         - secretKey: DB_PASSWORD
           remoteRef:
-            key: "rds!db-bc9e1596-3d78-4991-8bd9-58e17d3073c1"
+            key: "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab"
             property: password
         - secretKey: JWT_SECRET_KEY
           remoteRef:
-            key: "app/backend/secrets"
+            key: "secrets/backend/app"
             property: JWT_SECRET_KEY
         - secretKey: SECRET_KEY
           remoteRef:
-            key: "app/backend/secrets"
+            key: "secrets/backend/app"
             property: SECRET_KEY
       ---
       apiVersion: apps/v1
@@ -124,7 +124,7 @@ deploy-backend:
               - containerPort: 5000
               env:
               - name: DB_HOST
-                value: "database-1-use1.cujgu046ilz9.us-east-1.rds.amazonaws.com"
+                value: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
               - name: DB_NAME
                 value: "ecommerce_db"
               - name: FLASK_ENV

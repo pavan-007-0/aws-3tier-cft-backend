@@ -23,7 +23,7 @@ validate:
     - aws sts get-caller-identity
 
 # ==========================
-# INFRA (NETWORK + EKS + ECR)
+# INFRA (VPC + EKS + ECR)
 # ==========================
 infra:
   stage: infra
@@ -38,54 +38,93 @@ infra:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
   script:
-
-    # --------------------------
-    # VPC + NETWORK
-    # --------------------------
     - echo "Creating VPC..."
+
     - |
-      VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=ecommerce-vpc --query "Vpcs[0].VpcId" --output text)
+      VPC_ID=$(aws ec2 describe-vpcs \
+        --filters Name=tag:Name,Values=ecommerce-vpc \
+        --query "Vpcs[0].VpcId" --output text)
 
       if [ "$VPC_ID" = "None" ]; then
-        VPC_ID=$(aws ec2 create-vpc --cidr-block $VPC_CIDR --query "Vpc.VpcId" --output text)
-        aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=ecommerce-vpc
+        VPC_ID=$(aws ec2 create-vpc \
+          --cidr-block $VPC_CIDR \
+          --query "Vpc.VpcId" --output text)
+
+        aws ec2 create-tags \
+          --resources $VPC_ID \
+          --tags Key=Name,Value=ecommerce-vpc
       fi
 
-    - echo "Creating IGW..."
+    - echo "Creating Internet Gateway..."
+
     - |
-      IGW=$(aws ec2 create-internet-gateway --query "InternetGateway.InternetGatewayId" --output text)
-      aws ec2 attach-internet-gateway --internet-gateway-id $IGW --vpc-id $VPC_ID
+      IGW=$(aws ec2 create-internet-gateway \
+        --query "InternetGateway.InternetGatewayId" \
+        --output text)
 
-    - echo "Creating subnets..."
+      aws ec2 attach-internet-gateway \
+        --internet-gateway-id $IGW \
+        --vpc-id $VPC_ID
+
+    - echo "Creating Subnets..."
+
     - |
-      AZ1=$(aws ec2 describe-availability-zones --query "AvailabilityZones[0].ZoneName" --output text)
-      AZ2=$(aws ec2 describe-availability-zones --query "AvailabilityZones[1].ZoneName" --output text)
+      AZ1=$(aws ec2 describe-availability-zones \
+        --query "AvailabilityZones[0].ZoneName" --output text)
 
-      SUBNET_A=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $SUBNET_A_CIDR --availability-zone $AZ1 --query "Subnet.SubnetId" --output text)
-      SUBNET_B=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block $SUBNET_B_CIDR --availability-zone $AZ2 --query "Subnet.SubnetId" --output text)
+      AZ2=$(aws ec2 describe-availability-zones \
+        --query "AvailabilityZones[1].ZoneName" --output text)
 
-      aws ec2 modify-subnet-attribute --subnet-id $SUBNET_A --map-public-ip-on-launch
-      aws ec2 modify-subnet-attribute --subnet-id $SUBNET_B --map-public-ip-on-launch
+      SUBNET_A=$(aws ec2 create-subnet \
+        --vpc-id $VPC_ID \
+        --cidr-block $SUBNET_A_CIDR \
+        --availability-zone $AZ1 \
+        --query "Subnet.SubnetId" --output text)
 
-    - echo "Creating route table..."
+      SUBNET_B=$(aws ec2 create-subnet \
+        --vpc-id $VPC_ID \
+        --cidr-block $SUBNET_B_CIDR \
+        --availability-zone $AZ2 \
+        --query "Subnet.SubnetId" --output text)
+
+      aws ec2 modify-subnet-attribute \
+        --subnet-id $SUBNET_A \
+        --map-public-ip-on-launch
+
+      aws ec2 modify-subnet-attribute \
+        --subnet-id $SUBNET_B \
+        --map-public-ip-on-launch
+
+    - echo "Creating Route Table..."
+
     - |
-      RT=$(aws ec2 create-route-table --vpc-id $VPC_ID --query "RouteTable.RouteTableId" --output text)
-      aws ec2 create-route --route-table-id $RT --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW
-      aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_A
-      aws ec2 associate-route-table --route-table-id $RT --subnet-id $SUBNET_B
+      RT=$(aws ec2 create-route-table \
+        --vpc-id $VPC_ID \
+        --query "RouteTable.RouteTableId" --output text)
 
-    # --------------------------
-    # ECR
-    # --------------------------
+      aws ec2 create-route \
+        --route-table-id $RT \
+        --destination-cidr-block 0.0.0.0/0 \
+        --gateway-id $IGW
+
+      aws ec2 associate-route-table \
+        --route-table-id $RT \
+        --subnet-id $SUBNET_A
+
+      aws ec2 associate-route-table \
+        --route-table-id $RT \
+        --subnet-id $SUBNET_B
+
     - echo "Creating ECR..."
-    - |
-      aws ecr describe-repositories --repository-names $BACKEND_REPO || \
-      aws ecr create-repository --repository-name $BACKEND_REPO
 
-    # --------------------------
-    # EKS (NO NAT)
-    # --------------------------
-    - echo "Creating EKS..."
+    - |
+      aws ecr describe-repositories \
+        --repository-names $BACKEND_REPO 2>/dev/null || \
+      aws ecr create-repository \
+        --repository-name $BACKEND_REPO
+
+    - echo "Creating EKS Cluster..."
+
     - |
       cat <<EOF > eks.yaml
 apiVersion: eksctl.io/v1alpha5
@@ -116,7 +155,9 @@ EOF
 
     - eksctl create cluster -f eks.yaml
 
-    - aws eks update-kubeconfig --name $CLUSTER_NAME
+    - aws eks update-kubeconfig \
+        --name $CLUSTER_NAME \
+        --region $AWS_DEFAULT_REGION
 
 # ==========================
 # BUILD
@@ -130,10 +171,19 @@ build:
     - apk add --no-cache python3 py3-pip
     - pip install awscli
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+    - aws ecr get-login-password \
+      --region $AWS_DEFAULT_REGION | docker login \
+      --username AWS \
+      --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
     - docker build -t $BACKEND_REPO .
-    - docker tag $BACKEND_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
-    - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
+
+    - docker tag $BACKEND_REPO:latest \
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
+
+    - docker push \
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$BACKEND_REPO:latest
 
 # ==========================
 # DEPLOY
@@ -149,7 +199,7 @@ deploy:
     - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
   script:
-    - echo "Deploying app..."
+    - echo "Deploying backend..."
 
     - |
       cat <<EOF > deploy.yaml

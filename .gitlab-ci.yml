@@ -33,7 +33,14 @@ validate-yaml:
     - pip3 install yamllint
   script:
     - echo "Linting .gitlab-ci.yml..."
-    - yamllint -d "{extends: relaxed, rules: {line-length: {max: 200}}}" .gitlab-ci.yml
+    - |
+      cat > /tmp/.yamllint.yml << 'YAMLLINT_EOF'
+      extends: relaxed
+      rules:
+        line-length:
+          max: 200
+      YAMLLINT_EOF
+    - yamllint -c /tmp/.yamllint.yml .gitlab-ci.yml
     - echo "YAML syntax valid"
   only:
     - main
@@ -92,7 +99,8 @@ infra-ecr:
   script:
     - echo "Ensuring ECR repository exists..."
     - |
-      aws ecr describe-repositories --repository-names "$BACKEND_REPO" \
+      aws ecr describe-repositories \
+        --repository-names "$BACKEND_REPO" \
         --region "$AWS_DEFAULT_REGION" 2>/dev/null || \
       aws ecr create-repository \
         --repository-name "$BACKEND_REPO" \
@@ -145,7 +153,7 @@ infra-eks:
         --output text 2>&1 || echo "NOT_FOUND")
 
       if echo "$CLUSTER_EXISTS" | grep -q "NOT_FOUND\|ResourceNotFoundException"; then
-        echo "Cluster not found. Creating EKS cluster (this takes 15-20 mins)..."
+        echo "Cluster not found. Creating EKS cluster - this takes 15-20 mins..."
         eksctl create cluster \
           --name "$CLUSTER_NAME" \
           --region "$AWS_DEFAULT_REGION" \
@@ -170,7 +178,6 @@ infra-eks:
 
     - echo "Installing AWS Load Balancer Controller..."
     - |
-      # Create IAM policy for ALB controller if not exists
       POLICY_ARN=$(aws iam list-policies \
         --query "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn" \
         --output text)
@@ -186,7 +193,6 @@ infra-eks:
         echo "IAM policy already exists: $POLICY_ARN"
       fi
 
-      # Create service account
       eksctl create iamserviceaccount \
         --cluster "$CLUSTER_NAME" \
         --namespace kube-system \
@@ -195,7 +201,6 @@ infra-eks:
         --approve \
         --override-existing-serviceaccounts || true
 
-      # Install ALB controller via helm
       curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
       tar -xzf helm-v3.14.0-linux-amd64.tar.gz
       mv linux-amd64/helm /usr/local/bin/
@@ -216,6 +221,10 @@ infra-eks:
 
     - echo "Installing External Secrets Operator..."
     - |
+      curl -sLO https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz
+      tar -xzf helm-v3.14.0-linux-amd64.tar.gz || true
+      mv linux-amd64/helm /usr/local/bin/ 2>/dev/null || true
+
       helm repo add external-secrets https://charts.external-secrets.io
       helm repo update
 
@@ -226,27 +235,29 @@ infra-eks:
 
       echo "External Secrets Operator installed"
 
-    - echo "Creating ClusterSecretStore for AWS Secrets Manager..."
+    - echo "Creating ExternalSecrets IAM policy and service account..."
     - |
-      # Create IRSA for External Secrets
       POLICY_ESO=$(aws iam list-policies \
         --query "Policies[?PolicyName=='ExternalSecretsPolicy'].Arn" \
         --output text)
 
       if [ -z "$POLICY_ESO" ]; then
+        cat > /tmp/eso-policy.json << 'ESOPOLICY'
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Action": [
+              "secretsmanager:GetSecretValue",
+              "secretsmanager:DescribeSecret"
+            ],
+            "Resource": "*"
+          }]
+        }
+        ESOPOLICY
         aws iam create-policy \
           --policy-name ExternalSecretsPolicy \
-          --policy-document '{
-            "Version": "2012-10-17",
-            "Statement": [{
-              "Effect": "Allow",
-              "Action": [
-                "secretsmanager:GetSecretValue",
-                "secretsmanager:DescribeSecret"
-              ],
-              "Resource": "*"
-            }]
-          }'
+          --policy-document file:///tmp/eso-policy.json
         echo "ExternalSecrets IAM policy created"
       fi
 
@@ -262,16 +273,9 @@ infra-eks:
         --approve \
         --override-existing-serviceaccounts || true
 
-      ESO_ROLE_ARN=$(aws iam get-role \
-        --role-name "eksctl-${CLUSTER_NAME}-addon-iamserviceaccount-external-secrets-external-secrets-sa-Role1" \
-        --query "Role.Arn" --output text 2>/dev/null || \
-        eksctl get iamserviceaccount \
-          --cluster "$CLUSTER_NAME" \
-          --namespace external-secrets \
-          --name external-secrets-sa \
-          -o json 2>/dev/null | python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0]['status']['roleARN'])" 2>/dev/null || echo "")
-
-      kubectl apply -f - << CSSEOF
+    - echo "Creating ClusterSecretStore..."
+    - |
+      cat > /tmp/cluster-secret-store.yaml << CSSEOF
       apiVersion: external-secrets.io/v1beta1
       kind: ClusterSecretStore
       metadata:
@@ -287,12 +291,11 @@ infra-eks:
                   name: external-secrets-sa
                   namespace: external-secrets
       CSSEOF
-
+      kubectl apply -f /tmp/cluster-secret-store.yaml
       echo "ClusterSecretStore created"
 
     - echo "Verifying cluster is healthy..."
     - kubectl get nodes
-    - kubectl get pods -n kube-system | grep -E "aws-load-balancer|coredns|kube-proxy"
     - echo "EKS cluster fully ready"
   timeout: 40m
   only:
@@ -387,7 +390,7 @@ deploy-backend:
 
     - |
       echo "Deploying Kubernetes Manifests..."
-      cat > backend-manifests.yaml << EOF
+      cat > /tmp/backend-manifests.yaml << EOF
       apiVersion: external-secrets.io/v1beta1
       kind: ExternalSecret
       metadata:
@@ -512,7 +515,7 @@ deploy-backend:
                     number: 5000
       EOF
 
-      kubectl apply -f backend-manifests.yaml
+      kubectl apply -f /tmp/backend-manifests.yaml
       kubectl rollout status deployment/backend -n default --timeout=300s
       echo "Backend deployed successfully"
 

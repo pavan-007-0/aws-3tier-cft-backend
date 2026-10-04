@@ -7,14 +7,17 @@ stages:
 
 variables:
   DOCKER_TLS_CERTDIR: ""
-  AWS_DEFAULT_REGION: us-east-1
-  BACKEND_REPO: backend-repo
-  IMAGE_TAG: latest
-  CLUSTER_NAME: ecommerce-cluster
+  AWS_DEFAULT_REGION: ""
+  BACKEND_REPO: "backend-repo"
+  IMAGE_TAG: "latest"
+  CLUSTER_NAME: ""
   VPC_CIDR: "10.0.0.0/16"
   SUBNET_A_CIDR: "10.0.1.0/24"
   SUBNET_B_CIDR: "10.0.2.0/24"
-  RDS_ENDPOINT: "database-1.coxucmkk0rho.us-east-1.rds.amazonaws.com"
+  RDS_ENDPOINT: ""
+  RDS_SECRET_NAME: ""
+  APP_SECRET_NAME: ""
+  DB_NAME: ""
   NODE_INSTANCE_TYPE: "t3.medium"
   NODE_MIN: "1"
   NODE_MAX: "3"
@@ -36,8 +39,8 @@ validate-aws-credentials:
     - echo "Checking region is reachable..."
     - aws ec2 describe-availability-zones --region "$AWS_DEFAULT_REGION" --query "AvailabilityZones[0].State" --output text
     - echo "Verifying Secrets Manager secrets exist..."
-    - aws secretsmanager describe-secret --secret-id "secrets/backend/app" --query "Name" --output text
-    - aws secretsmanager describe-secret --secret-id "rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" --query "Name" --output text
+    - aws secretsmanager describe-secret --secret-id "${APP_SECRET_NAME}" --query "Name" --output text
+    - aws secretsmanager describe-secret --secret-id "${RDS_SECRET_NAME}" --query "Name" --output text
     - echo "All AWS credential checks passed"
   only:
     - main
@@ -334,13 +337,11 @@ infra-secrets:
     - echo "Ensuring app secrets exist in Secrets Manager..."
     - |
       aws secretsmanager describe-secret \
-        --secret-id "secrets/backend/app" \
-        --region "$AWS_DEFAULT_REGION" 2>/dev/null || \
-      aws secretsmanager create-secret \
-        --name "secrets/backend/app" \
-        --description "Backend app secrets" \
-        --secret-string '{"JWT_SECRET_KEY":"change-me-jwt-secret","SECRET_KEY":"change-me-secret-key"}' \
-        --region "$AWS_DEFAULT_REGION"
+        --secret-id "${APP_SECRET_NAME}" \
+        --region "$AWS_DEFAULT_REGION" 2>/dev/null || {
+          echo "ERROR: application secret ${APP_SECRET_NAME} must already exist";
+          exit 1;
+        }
     - echo "Secrets ready"
   only:
     - main
@@ -738,19 +739,19 @@ deploy-backend:
         "  data:" \
         "  - secretKey: DB_USER" \
         "    remoteRef:" \
-        "      key: rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" \
+        "      key: ${RDS_SECRET_NAME}" \
         "      property: username" \
         "  - secretKey: DB_PASSWORD" \
         "    remoteRef:" \
-        "      key: rds!db-a31a37c1-ddb2-4685-a5c6-dbd11475e1ab" \
+        "      key: ${RDS_SECRET_NAME}" \
         "      property: password" \
         "  - secretKey: JWT_SECRET_KEY" \
         "    remoteRef:" \
-        "      key: secrets/backend/app" \
+        "      key: ${APP_SECRET_NAME}" \
         "      property: JWT_SECRET_KEY" \
         "  - secretKey: SECRET_KEY" \
         "    remoteRef:" \
-        "      key: secrets/backend/app" \
+        "      key: ${APP_SECRET_NAME}" \
         "      property: SECRET_KEY" \
         > /tmp/external-secret.yaml
 
@@ -779,7 +780,7 @@ deploy-backend:
         "        - name: DB_HOST" \
         "          value: \"${RDS_ENDPOINT}\"" \
         "        - name: DB_NAME" \
-        "          value: ecommerce_db" \
+        "          value: \"${DB_NAME}\"" \
         "        - name: FLASK_ENV" \
         "          value: production" \
         "        - name: CORS_ORIGINS" \
